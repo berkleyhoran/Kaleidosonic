@@ -66,11 +66,9 @@ Shaders/
 - Internet access on first configure — CMake fetches JUCE 8.0.15 from GitHub
   (a few hundred MB) via `FetchContent`
 
-> This repo was scaffolded on a machine with neither CMake nor a Visual
-> Studio C++ toolchain installed, so the build below has **not** been
-> compiled/verified yet. The code follows current JUCE 8 CMake API patterns
-> throughout, but treat the first build as the real test — check back here
-> if something doesn't line up.
+> Verified: this builds clean with MSVC (Visual Studio Build Tools 2022,
+> v14.44 toolset) against JUCE 8.0.15, and the Standalone build launches and
+> renders correctly.
 
 **Configure & build (Release):**
 
@@ -79,12 +77,21 @@ cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-`COPY_PLUGIN_AFTER_BUILD` is enabled, so the VST3 is copied automatically to
-your system's VST3 folder (typically
-`C:\Program Files\Common Files\VST3\Kaleidosonic.vst3`) after a successful
-build — rescan plugins in your DAW and it should show up. The standalone
-app is built to
+The VST3 lands at
+`build/Kaleidosonic_artefacts/Release/VST3/Kaleidosonic.vst3` and the
+standalone app at
 `build/Kaleidosonic_artefacts/Release/Standalone/Kaleidosonic.exe`.
+
+`COPY_PLUGIN_AFTER_BUILD` is off, since copying into
+`C:\Program Files\Common Files\VST3\` needs admin rights that a normal build
+shouldn't require. To make your DAW see the plugin, either:
+- Copy the `.vst3` folder into `C:\Program Files\Common Files\VST3\`
+  yourself (one-time, needs an elevated copy — e.g. an admin PowerShell
+  running `Copy-Item -Recurse`), or
+- Point your DAW's plugin scan at
+  `build/Kaleidosonic_artefacts/Release/VST3/` directly as a custom VST3
+  search path (most DAWs support extra scan folders in preferences) — no
+  admin needed, and it's the faster loop while iterating.
 
 For a faster iterate loop, build `Debug` instead and open
 `build/Kaleidosonic.sln` in Visual Studio.
@@ -129,8 +136,5 @@ parameter.
 
 ## Known follow-ups
 
-- First build is unverified locally — see the note above. If MSVC reports
-  a shader-adjacent API mismatch, it's most likely a JUCE 8 OpenGL API
-  signature to double check against the exact fetched JUCE tag.
 - No preset persistence beyond the host's own automation/session state yet
   (no save/load of custom parameter "snapshots" as named user presets).

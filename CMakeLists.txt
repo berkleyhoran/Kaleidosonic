@@ -42,7 +42,7 @@ juce_add_plugin(Kaleidosonic
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD TRUE)
+    COPY_PLUGIN_AFTER_BUILD FALSE)
 
 juce_generate_juce_header(Kaleidosonic)
 

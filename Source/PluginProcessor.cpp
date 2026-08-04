@@ -6,7 +6,16 @@ KaleidosonicAudioProcessor::KaleidosonicAudioProcessor()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true))
 {
+    fileLogger.reset(juce::FileLogger::createDefaultAppLogger("Kaleidosonic", "Kaleidosonic.log",
+                                                                "Kaleidosonic log started"));
+    juce::Logger::setCurrentLogger(fileLogger.get());
+
     paramRefs.resolve(apvts);
+}
+
+KaleidosonicAudioProcessor::~KaleidosonicAudioProcessor()
+{
+    juce::Logger::setCurrentLogger(nullptr);
 }
 
 bool KaleidosonicAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const

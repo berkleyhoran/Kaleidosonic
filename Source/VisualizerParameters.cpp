@@ -36,6 +36,21 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::feedbackAmount, "Feedback Amount", 0.0f, 0.98f, 0.9f));
     params.push_back(makeFloat(ParamIDs::iterations, "Iterations", 4.0f, 64.0f, 24.0f));
     params.push_back(makeFloat(ParamIDs::distortion, "Distortion", 0.0f, 1.0f, 0.3f));
+    params.push_back(makeFloat(ParamIDs::zoomWander, "Zoom Wander", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::cameraShake, "Camera Shake", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::cameraScale, "Camera Scale", 0.2f, 6.0f, 1.0f));
+
+    params.push_back(makeFloat(ParamIDs::trails, "Trails", 0.0f, 0.97f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::blur, "Blur", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::noiseAmount, "Noise", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::datamosh, "Datamosh", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::bloomIntensity, "Bloom Intensity", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::vignette, "Vignette", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::chromaticAberration, "Chromatic Aberration", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::colorCycleSpeed, "Color Cycle Speed", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::pulseDepth, "Pulse Depth", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::posterize, "Posterize", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::fisheye, "Fisheye", 0.0f, 1.0f, 0.0f));
 
     return { params.begin(), params.end() };
 }
@@ -58,4 +73,19 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     feedbackAmount          = apvts.getRawParameterValue(ParamIDs::feedbackAmount);
     iterations              = apvts.getRawParameterValue(ParamIDs::iterations);
     distortion              = apvts.getRawParameterValue(ParamIDs::distortion);
+    zoomWander              = apvts.getRawParameterValue(ParamIDs::zoomWander);
+    cameraShake             = apvts.getRawParameterValue(ParamIDs::cameraShake);
+    cameraScale             = apvts.getRawParameterValue(ParamIDs::cameraScale);
+
+    trails                  = apvts.getRawParameterValue(ParamIDs::trails);
+    blur                    = apvts.getRawParameterValue(ParamIDs::blur);
+    noiseAmount             = apvts.getRawParameterValue(ParamIDs::noiseAmount);
+    datamosh                = apvts.getRawParameterValue(ParamIDs::datamosh);
+    bloomIntensity          = apvts.getRawParameterValue(ParamIDs::bloomIntensity);
+    vignette                = apvts.getRawParameterValue(ParamIDs::vignette);
+    chromaticAberration     = apvts.getRawParameterValue(ParamIDs::chromaticAberration);
+    colorCycleSpeed         = apvts.getRawParameterValue(ParamIDs::colorCycleSpeed);
+    pulseDepth              = apvts.getRawParameterValue(ParamIDs::pulseDepth);
+    posterize               = apvts.getRawParameterValue(ParamIDs::posterize);
+    fisheye                 = apvts.getRawParameterValue(ParamIDs::fisheye);
 }

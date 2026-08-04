@@ -52,7 +52,8 @@ target_sources(Kaleidosonic PRIVATE
     Source/AudioAnalyzer.cpp
     Source/VisualizerParameters.cpp
     Source/Presets/PresetManager.cpp
-    Source/Rendering/VisualizerRenderer.cpp)
+    Source/Rendering/VisualizerRenderer.cpp
+    Source/Rendering/FractalNavigator.cpp)
 
 target_compile_definitions(Kaleidosonic PUBLIC
     JUCE_WEB_BROWSER=0

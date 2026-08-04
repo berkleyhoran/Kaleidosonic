@@ -8,7 +8,7 @@ class KaleidosonicAudioProcessor : public juce::AudioProcessor
 {
 public:
     KaleidosonicAudioProcessor();
-    ~KaleidosonicAudioProcessor() override = default;
+    ~KaleidosonicAudioProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -38,5 +38,10 @@ public:
     VisualizerParameterRefs paramRefs;
 
 private:
+    // Writes to a real log file (unlike DBG, which is a no-op in Release
+    // builds) so shader compile/link failures are diagnosable even outside
+    // a debugger -- see VisualizerRenderer's compileProgram().
+    std::unique_ptr<juce::FileLogger> fileLogger;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KaleidosonicAudioProcessor)
 };

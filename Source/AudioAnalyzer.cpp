@@ -9,7 +9,7 @@ namespace
     // Raw FFT magnitude has no fixed ceiling, so squash it into a soft 0..1
     // range instead of a hard clip. The constant is a "typical loud music"
     // calibration, not a hard spec — nudge it if presets read too hot/cold.
-    float squash(float magnitude, float scale = 0.12f)
+    float squash(float magnitude, float scale = 0.28f)
     {
         return 1.0f - std::exp(-magnitude * scale);
     }
@@ -17,6 +17,18 @@ namespace
     float onePole(float previous, float target, float coeff)
     {
         return previous + coeff * (target - previous);
+    }
+
+    // Auto-gain: divides raw by a slowly-decaying tracker of its own recent
+    // peak (with a floor so silence doesn't blow the division up), so
+    // reactivity tracks the *dynamics* of whatever's playing rather than
+    // its absolute loudness -- quiet source material still reads as
+    // punchy, loud material doesn't just pin at the ceiling.
+    float updateAutoGain(float raw, float& peak, float decayPerCall)
+    {
+        peak = std::max(raw, peak * decayPerCall);
+        peak = std::max(peak, 0.05f);
+        return juce::jlimit(0.0f, 1.6f, raw / peak);
     }
 }
 
@@ -32,6 +44,14 @@ void AudioAnalyzer::prepare(double newSampleRate, int /*samplesPerBlock*/)
     treble = 0.0f;
     level = 0.0f;
     onsetPulse = 0.0f;
+    bassAG = 0.0f;
+    midAG = 0.0f;
+    trebleAG = 0.0f;
+    levelAG = 0.0f;
+    bassPeak = midPeak = treblePeak = levelPeak = 0.05f;
+    for (auto& s : waveform)
+        s.store(0.0f, std::memory_order_relaxed);
+    waveformWriteIndex.store(0, std::memory_order_relaxed);
 }
 
 void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
@@ -52,6 +72,10 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
 
         blockSumSquares += sample * sample;
 
+        const int wIndex = waveformWriteIndex.load(std::memory_order_relaxed);
+        waveform[(size_t) wIndex].store(sample, std::memory_order_relaxed);
+        waveformWriteIndex.store((wIndex + 1) % waveformSize, std::memory_order_relaxed);
+
         fifo[(size_t) fifoIndex++] = sample;
         if (fifoIndex == fftSize)
         {
@@ -61,9 +85,14 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
     }
 
     const float rms = std::sqrt(blockSumSquares / (float) numSamples);
-    const float target = juce::jlimit(0.0f, 1.0f, rms * 4.0f);
+    const float target = juce::jlimit(0.0f, 1.0f, rms * 7.0f);
     const float coeff = target > level.load(std::memory_order_relaxed) ? 0.55f : 0.08f;
-    level.store(onePole(level.load(std::memory_order_relaxed), target, coeff), std::memory_order_relaxed);
+    const float smoothedLevel = onePole(level.load(std::memory_order_relaxed), target, coeff);
+    level.store(smoothedLevel, std::memory_order_relaxed);
+
+    const float dt = (float) numSamples / (float) sampleRate;
+    const float levelPeakDecay = std::exp(-dt / 8.0f); // ~8s time constant
+    levelAG.store(updateAutoGain(smoothedLevel, levelPeak, levelPeakDecay), std::memory_order_relaxed);
 }
 
 void AudioAnalyzer::runFFTOnFifo()
@@ -98,21 +127,37 @@ void AudioAnalyzer::runFFTOnFifo()
     const float midTarget  = squash(midCount  > 0 ? midSum  / (float) midCount  : 0.0f);
     const float trebTarget = squash(trebCount > 0 ? trebSum / (float) trebCount : 0.0f);
 
-    bass.store(onePole(bass.load(std::memory_order_relaxed), bassTarget,
-                        bassTarget > bass.load(std::memory_order_relaxed) ? 0.5f : 0.15f),
-               std::memory_order_relaxed);
-    mid.store(onePole(mid.load(std::memory_order_relaxed), midTarget,
-                       midTarget > mid.load(std::memory_order_relaxed) ? 0.5f : 0.15f),
-              std::memory_order_relaxed);
-    treble.store(onePole(treble.load(std::memory_order_relaxed), trebTarget,
-                          trebTarget > treble.load(std::memory_order_relaxed) ? 0.5f : 0.15f),
-                 std::memory_order_relaxed);
+    const float smoothedBass = onePole(bass.load(std::memory_order_relaxed), bassTarget,
+                                        bassTarget > bass.load(std::memory_order_relaxed) ? 0.5f : 0.15f);
+    const float smoothedMid = onePole(mid.load(std::memory_order_relaxed), midTarget,
+                                       midTarget > mid.load(std::memory_order_relaxed) ? 0.5f : 0.15f);
+    const float smoothedTreble = onePole(treble.load(std::memory_order_relaxed), trebTarget,
+                                          trebTarget > treble.load(std::memory_order_relaxed) ? 0.5f : 0.15f);
+    bass.store(smoothedBass, std::memory_order_relaxed);
+    mid.store(smoothedMid, std::memory_order_relaxed);
+    treble.store(smoothedTreble, std::memory_order_relaxed);
+
+    const float hopSeconds = (float) fftSize / (float) sampleRate;
+    const float bandPeakDecay = std::exp(-hopSeconds / 7.0f); // ~7s time constant
+    bassAG.store(updateAutoGain(smoothedBass, bassPeak, bandPeakDecay), std::memory_order_relaxed);
+    midAG.store(updateAutoGain(smoothedMid, midPeak, bandPeakDecay), std::memory_order_relaxed);
+    trebleAG.store(updateAutoGain(smoothedTreble, treblePeak, bandPeakDecay), std::memory_order_relaxed);
 
     flux /= (float) numBins;
-    const float threshold = fluxAverage * 1.6f + 0.001f;
+    const float threshold = fluxAverage * 1.35f + 0.0006f;
     if (flux > threshold)
         onsetPulse.store(juce::jlimit(0.0f, 1.0f, (flux - fluxAverage) / (fluxAverage + 0.001f)),
                           std::memory_order_relaxed);
 
     fluxAverage = onePole(fluxAverage, flux, 0.1f);
+}
+
+void AudioAnalyzer::copyWaveform(std::array<float, (size_t) waveformSize>& out) const noexcept
+{
+    const int start = waveformWriteIndex.load(std::memory_order_relaxed);
+    for (int i = 0; i < waveformSize; ++i)
+    {
+        const int idx = (start + i) % waveformSize;
+        out[(size_t) i] = waveform[(size_t) idx].load(std::memory_order_relaxed);
+    }
 }

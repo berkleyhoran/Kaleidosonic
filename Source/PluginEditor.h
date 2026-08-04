@@ -16,8 +16,11 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    bool keyPressed(const juce::KeyPress& key) override;
 
 private:
+    void toggleFullscreen();
+
     struct ParamSlider
     {
         juce::Slider slider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -31,8 +34,11 @@ private:
     VisualizerRenderer renderer;
 
     juce::TextButton toggleControlsButton { "Controls" };
+    juce::TextButton fullscreenButton { "Fullscreen" };
     juce::Viewport controlsViewport;
     juce::Component controlsContent;
+
+    bool isFullscreenActive = false;
 
     juce::ComboBox presetBox;
     juce::Label presetLabel;

@@ -27,6 +27,20 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     addParamSlider(ParamIDs::feedbackAmount, "Feedback");
     addParamSlider(ParamIDs::iterations, "Iterations");
     addParamSlider(ParamIDs::distortion, "Distortion");
+    addParamSlider(ParamIDs::zoomWander, "Zoom Wander");
+    addParamSlider(ParamIDs::cameraShake, "Camera Shake");
+    addParamSlider(ParamIDs::cameraScale, "Camera Scale");
+    addParamSlider(ParamIDs::trails, "Trails");
+    addParamSlider(ParamIDs::blur, "Blur");
+    addParamSlider(ParamIDs::noiseAmount, "Noise");
+    addParamSlider(ParamIDs::datamosh, "Datamosh");
+    addParamSlider(ParamIDs::bloomIntensity, "Bloom Intensity");
+    addParamSlider(ParamIDs::vignette, "Vignette");
+    addParamSlider(ParamIDs::chromaticAberration, "Chromatic Aberration");
+    addParamSlider(ParamIDs::colorCycleSpeed, "Color Cycle Speed");
+    addParamSlider(ParamIDs::pulseDepth, "Pulse Depth");
+    addParamSlider(ParamIDs::posterize, "Posterize");
+    addParamSlider(ParamIDs::fisheye, "Fisheye");
 
     controlsViewport.setViewedComponent(&controlsContent, false);
     controlsViewport.setScrollBarsShown(true, false);
@@ -41,9 +55,13 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     };
     addAndMakeVisible(toggleControlsButton);
 
+    fullscreenButton.onClick = [this] { toggleFullscreen(); };
+    addAndMakeVisible(fullscreenButton);
+
     setResizable(true, true);
     setResizeLimits(480, 360, 3840, 2160);
     setSize(900, 650);
+    setWantsKeyboardFocus(true);
 
     renderer.attachTo(*this);
 }
@@ -75,10 +93,55 @@ void KaleidosonicAudioProcessorEditor::paint(juce::Graphics&)
     // Background is the OpenGL-rendered visualizer; nothing to paint here.
 }
 
+bool KaleidosonicAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
+{
+    if (key.getTextCharacter() == 'f' || key.getTextCharacter() == 'F')
+    {
+        toggleFullscreen();
+        return true;
+    }
+    if (key == juce::KeyPress::escapeKey && isFullscreenActive)
+    {
+        toggleFullscreen();
+        return true;
+    }
+    return false;
+}
+
+void KaleidosonicAudioProcessorEditor::toggleFullscreen()
+{
+    // Uses JUCE's native kiosk mode, which saves/restores the component's
+    // bounds itself. Works reliably for the Standalone app; VST3 hosts vary
+    // in how much they let a plugin editor's top-level window move/resize,
+    // so treat this as "usually works, host-dependent" rather than
+    // guaranteed true OS fullscreen.
+    auto* top = getTopLevelComponent();
+    if (top == nullptr)
+        return;
+
+    auto& desktop = juce::Desktop::getInstance();
+    if (! isFullscreenActive)
+    {
+        desktop.setKioskModeComponent(top, false);
+        controlsViewport.setVisible(false);
+        toggleControlsButton.setToggleState(false, juce::dontSendNotification);
+        isFullscreenActive = true;
+    }
+    else
+    {
+        desktop.setKioskModeComponent(nullptr);
+        isFullscreenActive = false;
+    }
+
+    resized();
+}
+
 void KaleidosonicAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds();
-    toggleControlsButton.setBounds(bounds.removeFromTop(28).removeFromLeft(90).reduced(2));
+    auto topBar = bounds.removeFromTop(28);
+    toggleControlsButton.setBounds(topBar.removeFromLeft(90).reduced(2));
+    fullscreenButton.setBounds(topBar.removeFromLeft(90).reduced(2));
 
     if (! controlsViewport.isVisible())
         return;

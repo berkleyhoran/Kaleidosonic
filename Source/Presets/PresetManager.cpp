@@ -12,6 +12,15 @@ namespace
         { BinaryData::plasma_feedback_frag,    BinaryData::plasma_feedback_fragSize },
         { BinaryData::ifs_tunnel_frag,         BinaryData::ifs_tunnel_fragSize },
         { BinaryData::tunnel_spiral_frag,      BinaryData::tunnel_spiral_fragSize },
+        { BinaryData::burning_ship_frag,       BinaryData::burning_ship_fragSize },
+        { BinaryData::apollonian_frag,         BinaryData::apollonian_fragSize },
+        { BinaryData::raymarch_tunnel_frag,    BinaryData::raymarch_tunnel_fragSize },
+        { BinaryData::particle_bloom_frag,     BinaryData::particle_bloom_fragSize },
+        { BinaryData::oscilloscope_frag,       BinaryData::oscilloscope_fragSize },
+        { BinaryData::waveform_scope_frag,     BinaryData::waveform_scope_fragSize },
+        { BinaryData::sierpinski_triforce_frag, BinaryData::sierpinski_triforce_fragSize },
+        { BinaryData::fractal_bubbles_frag,    BinaryData::fractal_bubbles_fragSize },
+        { BinaryData::starfield_warp_frag,     BinaryData::starfield_warp_fragSize },
     };
 
     constexpr int numPresets = (int) (sizeof(presetResources) / sizeof(Resource));

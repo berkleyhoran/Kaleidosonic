@@ -22,6 +22,23 @@ namespace ParamIDs
     static const juce::String feedbackAmount         { "feedbackAmount" };
     static const juce::String iterations             { "iterations" };
     static const juce::String distortion             { "distortion" };
+    static const juce::String zoomWander             { "zoomWander" };
+    static const juce::String cameraShake            { "cameraShake" };
+    static const juce::String cameraScale            { "cameraScale" };
+
+    // Global post-FX, applied after whichever preset(s) render, regardless
+    // of which preset is selected.
+    static const juce::String trails                 { "trails" };
+    static const juce::String blur                   { "blur" };
+    static const juce::String noiseAmount             { "noiseAmount" };
+    static const juce::String datamosh               { "datamosh" };
+    static const juce::String bloomIntensity         { "bloomIntensity" };
+    static const juce::String vignette               { "vignette" };
+    static const juce::String chromaticAberration    { "chromaticAberration" };
+    static const juce::String colorCycleSpeed        { "colorCycleSpeed" };
+    static const juce::String pulseDepth             { "pulseDepth" };
+    static const juce::String posterize              { "posterize" };
+    static const juce::String fisheye                { "fisheye" };
 }
 
 // Names of the built-in presets, in the order they are compiled/selected.
@@ -34,7 +51,16 @@ namespace PresetNames
         "Julia Kaleidoscope",
         "Plasma Feedback",
         "IFS Tunnel",
-        "Tunnel Spiral"
+        "Tunnel Spiral",
+        "Burning Ship",
+        "Apollonian Gasket",
+        "Raymarch Tunnel 3D",
+        "Particle Bloom",
+        "Oscilloscope Glow",
+        "Waveform Scope",
+        "Sierpinski Triforce",
+        "Fractal Bubbles",
+        "Starfield Warp"
     };
 }
 
@@ -60,6 +86,21 @@ struct VisualizerParameterRefs
     std::atomic<float>* feedbackAmount     = nullptr;
     std::atomic<float>* iterations         = nullptr;
     std::atomic<float>* distortion         = nullptr;
+    std::atomic<float>* zoomWander         = nullptr;
+    std::atomic<float>* cameraShake        = nullptr;
+    std::atomic<float>* cameraScale        = nullptr;
+
+    std::atomic<float>* trails             = nullptr;
+    std::atomic<float>* blur               = nullptr;
+    std::atomic<float>* noiseAmount        = nullptr;
+    std::atomic<float>* datamosh           = nullptr;
+    std::atomic<float>* bloomIntensity     = nullptr;
+    std::atomic<float>* vignette           = nullptr;
+    std::atomic<float>* chromaticAberration = nullptr;
+    std::atomic<float>* colorCycleSpeed    = nullptr;
+    std::atomic<float>* pulseDepth         = nullptr;
+    std::atomic<float>* posterize          = nullptr;
+    std::atomic<float>* fisheye            = nullptr;
 
     void resolve(juce::AudioProcessorValueTreeState& apvts);
 };

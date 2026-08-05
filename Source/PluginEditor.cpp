@@ -30,6 +30,7 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     addParamSlider(ParamIDs::zoomWander, "Zoom Wander");
     addParamSlider(ParamIDs::cameraShake, "Camera Shake");
     addParamSlider(ParamIDs::cameraScale, "Camera Scale");
+    addParamSlider(ParamIDs::palette, "Palette");
     addParamSlider(ParamIDs::trails, "Trails");
     addParamSlider(ParamIDs::blur, "Blur");
     addParamSlider(ParamIDs::noiseAmount, "Noise");
@@ -80,6 +81,10 @@ void KaleidosonicAudioProcessorEditor::addParamSlider(const juce::String& paramI
     controlsContent.addAndMakeVisible(ps->label);
 
     ps->slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    // Sliders must not swallow the mouse wheel: the wheel scrolls the panel
+    // (or zooms an explorer preset), and accidentally yanking parameter
+    // values while scrolling was a genuine usability bug.
+    ps->slider.setScrollWheelEnabled(false);
     controlsContent.addAndMakeVisible(ps->slider);
 
     ps->attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -105,7 +110,56 @@ bool KaleidosonicAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
         toggleFullscreen();
         return true;
     }
+    // Up/down arrows zoom the explorer presets (no-ops elsewhere).
+    if (key == juce::KeyPress::upKey)
+    {
+        renderer.requestManualZoom(3.0f);
+        return true;
+    }
+    if (key == juce::KeyPress::downKey)
+    {
+        renderer.requestManualZoom(-3.0f);
+        return true;
+    }
+    // [ / ] step through presets -- handy live, and matches the combobox.
+    const auto ch = key.getTextCharacter();
+    if (ch == '[' || ch == ']')
+    {
+        if (auto* param = processorRef.apvts.getParameter(ParamIDs::presetIndex))
+        {
+            const int numPresets = PresetNames::all.size();
+            const int current = juce::roundToInt(param->convertFrom0to1(param->getValue()));
+            const int next = juce::jlimit(0, numPresets - 1, current + (ch == ']' ? 1 : -1));
+            param->setValueNotifyingHost(param->convertTo0to1((float) next));
+        }
+        return true;
+    }
     return false;
+}
+
+void KaleidosonicAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& event,
+                                                      const juce::MouseWheelDetails& wheel)
+{
+    juce::ignoreUnused(event);
+    // Wheel over the visual zooms the explorer presets. (Events over the
+    // controls panel are consumed by the Viewport for scrolling and never
+    // reach here.)
+    renderer.requestManualZoom(wheel.deltaY * 12.0f);
+}
+
+void KaleidosonicAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+{
+    lastDragPosition = event.position;
+}
+
+void KaleidosonicAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
+{
+    const auto delta = event.position - lastDragPosition;
+    lastDragPosition = event.position;
+    const float h = (float) juce::jmax(getHeight(), 1);
+    // Screen-pixel drag deltas as fractions of the view height; the
+    // renderer flips signs so the content follows the cursor.
+    renderer.requestManualPan(delta.x / h, delta.y / h);
 }
 
 void KaleidosonicAudioProcessorEditor::toggleFullscreen()

@@ -18,8 +18,22 @@ public:
     void resized() override;
     bool keyPressed(const juce::KeyPress& key) override;
 
+    // Manual navigation for the explorer presets: wheel and up/down arrows
+    // zoom, dragging the visual pans. Events over the controls panel never
+    // reach these (the Viewport consumes them for scrolling instead).
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
+    void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDrag(const juce::MouseEvent& event) override;
+
 private:
     void toggleFullscreen();
+
+    // Opaque backdrop for the controls panel, so labels are readable over
+    // any visual instead of floating transparently on top of it.
+    struct ControlsPanel : juce::Component
+    {
+        void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xf0121219)); }
+    };
 
     struct ParamSlider
     {
@@ -36,9 +50,10 @@ private:
     juce::TextButton toggleControlsButton { "Controls" };
     juce::TextButton fullscreenButton { "Fullscreen" };
     juce::Viewport controlsViewport;
-    juce::Component controlsContent;
+    ControlsPanel controlsContent;
 
     bool isFullscreenActive = false;
+    juce::Point<float> lastDragPosition;
 
     juce::ComboBox presetBox;
     juce::Label presetLabel;

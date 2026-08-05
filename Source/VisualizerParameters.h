@@ -25,6 +25,7 @@ namespace ParamIDs
     static const juce::String zoomWander             { "zoomWander" };
     static const juce::String cameraShake            { "cameraShake" };
     static const juce::String cameraScale            { "cameraScale" };
+    static const juce::String palette                { "palette" };
 
     // Global post-FX, applied after whichever preset(s) render, regardless
     // of which preset is selected.
@@ -60,7 +61,14 @@ namespace PresetNames
         "Waveform Scope",
         "Sierpinski Triforce",
         "Fractal Bubbles",
-        "Starfield Warp"
+        "Starfield Warp",
+        "Mandelbox",
+        "Mandelbrot Explorer",
+        "Burning Ship Explorer",
+        "Perpendicular Ship",
+        "Buffalo Fractal",
+        "Tricorn",
+        "Burning Ship 3D"
     };
 }
 
@@ -89,6 +97,7 @@ struct VisualizerParameterRefs
     std::atomic<float>* zoomWander         = nullptr;
     std::atomic<float>* cameraShake        = nullptr;
     std::atomic<float>* cameraScale        = nullptr;
+    std::atomic<float>* palette            = nullptr;
 
     std::atomic<float>* trails             = nullptr;
     std::atomic<float>* blur               = nullptr;

@@ -29,6 +29,13 @@ public:
     void attachTo(juce::Component& component);
     void detach();
 
+    // Manual navigation for the "explorer" presets, called from the editor
+    // (mouse wheel / arrow keys / drag). Thread-safe: accumulates into
+    // atomics that the render thread consumes each frame. Ignored unless
+    // the active preset is one of the manual explorers.
+    void requestManualZoom(float steps);                 // +steps zooms in, -steps zooms out
+    void requestManualPan(float dxFraction, float dyFraction); // fractions of the current view radius
+
     // juce::OpenGLRenderer
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
@@ -41,8 +48,9 @@ private:
 
         std::unique_ptr<juce::OpenGLShaderProgram::Uniform> resolution, time, bass, mid, treble, level, onset,
             reactivity, zoomSpeed, rotationSpeed, hue, saturation, brightness, contrast, kaleidoscopeSegments,
-            feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, prevFrame, waveform,
-            fractalRe, fractalIm, fractalRadius, fractalFade;
+            feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
+            fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
+            ifsZoomScale, ifsFade, zoomPhase;
     };
 
     struct CompiledPreset
@@ -72,6 +80,26 @@ private:
             posterize, fisheye;
     };
 
+    // One escape-time fractal navigator + its GPU reference-orbit texture,
+    // bound to a specific preset index (matching PresetNames::all in
+    // VisualizerParameters.h). Two autopilot slots (the kaleidoscope dive
+    // presets) and five manual "explorer" slots.
+    struct FractalSlot
+    {
+        FractalSlot(int preset, FractalFormula formula, FractalNavigator::Mode mode, double cx, double cy,
+                    double startRadius, double panYSignToUse = 1.0)
+            : presetIndex(preset), nav(formula, mode, cx, cy, startRadius),
+              manual(mode == FractalNavigator::Mode::Manual), panYSign(panYSignToUse)
+        {
+        }
+
+        int presetIndex;
+        FractalNavigator nav;
+        bool manual;
+        double panYSign; // -1 for the ship-family presets, whose shaders flip the imaginary axis
+        GLuint texture = 0;
+    };
+
     void ensureFramebuffersSized(int width, int height);
     void renderPresetToTarget(CompiledPreset& preset, juce::OpenGLFrameBuffer& target, GLuint prevFrameTex,
                                int width, int height, float onsetEnvelope, int presetIndex);
@@ -79,19 +107,37 @@ private:
     void setCommonUniforms(CommonUniforms& u, GLuint prevFrameTex, float onsetEnvelope, int presetIndex);
     void updateWaveformTexture();
     void updateNavigators(float dt);
+    void uploadOrbitTextureIfDirty(FractalNavigator& nav, GLuint texture);
+    FractalSlot* slotForPreset(int presetIndex);
 
     AudioAnalyzer& analyzer;
     VisualizerParameterRefs& params;
 
-    // Distance-estimator-guided autopilots (real C++ double precision) that
-    // decide where Mandelbrot Pulse / Burning Ship zoom each frame -- see
-    // FractalNavigator.h. Indices must match PresetNames::all in
-    // VisualizerParameters.h.
-    static constexpr int mandelbrotPresetIndex = 0;
-    static constexpr int burningShipPresetIndex = 5;
-    FractalNavigator mandelbrotNav { -0.745, 0.11, false };
-    FractalNavigator burningShipNav { -1.75, -0.03, true };
+    std::vector<FractalSlot> fractalSlots;
     std::mt19937 navigatorRng { std::random_device {}() };
+
+    // Manual navigation input from the editor, consumed once per frame by
+    // updateNavigators() and routed to the active explorer preset's slot.
+    std::atomic<float> pendingZoomSteps { 0.0f };
+    std::atomic<float> pendingPanX { 0.0f };
+    std::atomic<float> pendingPanY { 0.0f };
+
+    // Unbounded, continuously-shrinking zoom scale used by the exactly-
+    // self-similar IFS/DE presets (Sierpinski, Apollonian, Julia) for
+    // genuinely continuous deep zoom -- updated the same iterative way as
+    // FractalNavigator's viewRadius (never recomputed from a growing
+    // exponent, which is what would underflow). See updateNavigators()
+    // and common.glsl's uIfsZoomScale for why these don't need
+    // perturbation theory to go deep, just double-float precision carried
+    // through the fold loop itself.
+    double ifsZoomScale = 1.0;
+    double ifsTimeSinceReset = 0.0;
+
+    // Sawtooth log2-zoom phase in [0,1) for the exactly-self-similar
+    // Sierpinski dive (see uZoomPhase in common.glsl): wrapping the
+    // *exponent* is what makes that zoom literally infinite with plain
+    // float precision.
+    double zoomPhase = 0.0;
 
     juce::OpenGLContext context;
     juce::Component* attachedComponent = nullptr;

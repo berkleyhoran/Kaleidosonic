@@ -21,6 +21,13 @@ namespace
         { BinaryData::sierpinski_triforce_frag, BinaryData::sierpinski_triforce_fragSize },
         { BinaryData::fractal_bubbles_frag,    BinaryData::fractal_bubbles_fragSize },
         { BinaryData::starfield_warp_frag,     BinaryData::starfield_warp_fragSize },
+        { BinaryData::mandelbox_frag,          BinaryData::mandelbox_fragSize },
+        { BinaryData::mandelbrot_explorer_frag, BinaryData::mandelbrot_explorer_fragSize },
+        { BinaryData::burning_ship_explorer_frag, BinaryData::burning_ship_explorer_fragSize },
+        { BinaryData::perpendicular_ship_frag, BinaryData::perpendicular_ship_fragSize },
+        { BinaryData::buffalo_frag,            BinaryData::buffalo_fragSize },
+        { BinaryData::tricorn_frag,            BinaryData::tricorn_fragSize },
+        { BinaryData::burning_ship_3d_frag,    BinaryData::burning_ship_3d_fragSize },
     };
 
     constexpr int numPresets = (int) (sizeof(presetResources) / sizeof(Resource));

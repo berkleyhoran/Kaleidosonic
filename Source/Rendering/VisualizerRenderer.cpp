@@ -1,5 +1,6 @@
 #include "VisualizerRenderer.h"
 #include "../Presets/PresetManager.h"
+#include "DoubleDouble.h"
 
 using namespace juce::gl;
 
@@ -235,16 +236,6 @@ namespace
             u->set(args...);
     }
 
-    // Splits a real C++ double into a (hi, lo) float32 pair for upload as a
-    // GLSL double-float value -- hi captures the value to float32
-    // precision, lo captures what that rounding dropped, so hi+lo together
-    // carry far more precision than either float alone.
-    void splitDouble(double v, float& hi, float& lo)
-    {
-        hi = (float) v;
-        lo = (float) (v - (double) hi);
-    }
-
     // Logger::writeToLog (unlike DBG) still works in Release builds, so a
     // shader that fails to compile is diagnosable from Kaleidosonic.log
     // instead of just silently rendering black.
@@ -301,12 +292,18 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     zoomWander              = makeUniformIfPresent(program, "uZoomWander");
     cameraShake             = makeUniformIfPresent(program, "uCameraShake");
     cameraScale             = makeUniformIfPresent(program, "uCameraScale");
+    palette                 = makeUniformIfPresent(program, "uPalette");
     prevFrame               = makeUniformIfPresent(program, "uPrevFrame");
     waveform                = makeUniformIfPresent(program, "uWaveform");
-    fractalRe               = makeUniformIfPresent(program, "uFractalRe");
-    fractalIm               = makeUniformIfPresent(program, "uFractalIm");
+    fractalOrbit            = makeUniformIfPresent(program, "uFractalOrbit");
+    fractalOrbitLength      = makeUniformIfPresent(program, "uFractalOrbitLength");
     fractalRadius           = makeUniformIfPresent(program, "uFractalRadius");
     fractalFade             = makeUniformIfPresent(program, "uFractalFade");
+    fractalRefOffset        = makeUniformIfPresent(program, "uFractalRefOffset");
+    fractalIterNeed         = makeUniformIfPresent(program, "uFractalIterNeed");
+    ifsZoomScale            = makeUniformIfPresent(program, "uIfsZoomScale");
+    ifsFade                 = makeUniformIfPresent(program, "uIfsFade");
+    zoomPhase               = makeUniformIfPresent(program, "uZoomPhase");
 }
 
 VisualizerRenderer::BlitUniforms::BlitUniforms(juce::OpenGLShaderProgram& program)
@@ -345,6 +342,39 @@ VisualizerRenderer::PostUniforms::PostUniforms(juce::OpenGLShaderProgram& progra
 VisualizerRenderer::VisualizerRenderer(AudioAnalyzer& analyzerToUse, VisualizerParameterRefs& paramsToUse)
     : analyzer(analyzerToUse), params(paramsToUse)
 {
+    // Preset indices must match PresetNames::all in VisualizerParameters.h.
+    // Two autopilot dive presets (boundary-bisection locked -- see
+    // FractalNavigator.h) and five manually-navigated explorers. The
+    // ship-family explorers pass panYSign -1 because their shaders flip the
+    // imaginary axis into the classic orientation.
+    using Mode = FractalNavigator::Mode;
+    fractalSlots.reserve(7);
+    fractalSlots.emplace_back(0, FractalFormula::Mandelbrot, Mode::Autopilot, -0.745, 0.11, 1.4);
+    fractalSlots.emplace_back(5, FractalFormula::BurningShip, Mode::Autopilot, -1.75, -0.03, 1.4);
+    fractalSlots.emplace_back(15, FractalFormula::Mandelbrot, Mode::Manual, -0.6, 0.0, 2.6);
+    fractalSlots.emplace_back(16, FractalFormula::BurningShip, Mode::Manual, -0.45, -0.5, 2.4, -1.0);
+    fractalSlots.emplace_back(17, FractalFormula::PerpendicularShip, Mode::Manual, -0.45, -0.4, 2.4, -1.0);
+    fractalSlots.emplace_back(18, FractalFormula::Buffalo, Mode::Manual, -0.6, -0.35, 2.6, -1.0);
+    fractalSlots.emplace_back(19, FractalFormula::Tricorn, Mode::Manual, -0.25, 0.0, 2.8);
+}
+
+void VisualizerRenderer::requestManualZoom(float steps)
+{
+    pendingZoomSteps.fetch_add(steps);
+}
+
+void VisualizerRenderer::requestManualPan(float dxFraction, float dyFraction)
+{
+    pendingPanX.fetch_add(dxFraction);
+    pendingPanY.fetch_add(dyFraction);
+}
+
+VisualizerRenderer::FractalSlot* VisualizerRenderer::slotForPreset(int presetIndex)
+{
+    for (auto& slot : fractalSlots)
+        if (slot.presetIndex == presetIndex)
+            return &slot;
+    return nullptr;
 }
 
 VisualizerRenderer::~VisualizerRenderer()
@@ -410,10 +440,32 @@ void VisualizerRenderer::newOpenGLContextCreated()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, AudioAnalyzer::waveformSize, 1, 0, GL_RED, GL_FLOAT, nullptr);
 
+    // Perturbation reference orbit textures, one per fractal slot: one
+    // texel per iteration, RGBA32F = (re.hi, re.lo, im.hi, im.lo). Nearest
+    // filtering + texelFetch on the GPU side, since these are indexed
+    // exactly by integer iteration, not sampled/interpolated. Marking every
+    // orbit dirty forces a re-upload into the fresh GL context.
+    for (auto& slot : fractalSlots)
+    {
+        glGenTextures(1, &slot.texture);
+        glBindTexture(GL_TEXTURE_2D, slot.texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, FractalNavigator::maxReferenceIterations, 1, 0, GL_RGBA,
+                     GL_FLOAT, nullptr);
+        if (slot.nav.referenceOrbitLength() > 0)
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, slot.nav.referenceOrbitLength(), 1, GL_RGBA, GL_FLOAT,
+                            slot.nav.referenceOrbitData().data());
+    }
+
     lastWidth = lastHeight = 0;
     startTimeMs = juce::Time::getMillisecondCounterHiRes();
     lastFrameTimeMs = startTimeMs;
     onsetEnvelope = 0.0f;
+    ifsZoomScale = 1.0;
+    ifsTimeSinceReset = 0.0;
 }
 
 void VisualizerRenderer::openGLContextClosing()
@@ -442,6 +494,15 @@ void VisualizerRenderer::openGLContextClosing()
     {
         glDeleteTextures(1, &waveformTexture);
         waveformTexture = 0;
+    }
+
+    for (auto& slot : fractalSlots)
+    {
+        if (slot.texture != 0)
+        {
+            glDeleteTextures(1, &slot.texture);
+            slot.texture = 0;
+        }
     }
 }
 
@@ -493,8 +554,70 @@ void VisualizerRenderer::updateNavigators(float dt)
                                      * (double) cameraShakeValue;
     const double rate = std::pow(baseRate, audioSpeedup);
 
-    mandelbrotNav.update((double) dt, rate, navigatorRng);
-    burningShipNav.update((double) dt, rate, navigatorRng);
+    // Manual input from the editor goes to the active preset's slot only
+    // (and is consumed regardless, so stale input can't pile up and replay
+    // when switching onto an explorer preset).
+    const float zoomSteps = pendingZoomSteps.exchange(0.0f);
+    const float panDx = pendingPanX.exchange(0.0f);
+    const float panDy = pendingPanY.exchange(0.0f);
+    const int activePreset = params.presetIndex != nullptr ? juce::roundToInt(params.presetIndex->load()) : 0;
+
+    for (auto& slot : fractalSlots)
+    {
+        if (slot.manual)
+        {
+            if (slot.presetIndex == activePreset)
+            {
+                if (zoomSteps != 0.0f)
+                    slot.nav.zoomBy(std::pow(0.9, (double) zoomSteps));
+                if (panDx != 0.0f || panDy != 0.0f)
+                    slot.nav.panBy((double) -panDx, (double) panDy * slot.panYSign);
+            }
+            slot.nav.tick((double) dt);
+        }
+        else
+        {
+            slot.nav.update((double) dt, rate, navigatorRng);
+        }
+        uploadOrbitTextureIfDirty(slot.nav, slot.texture);
+    }
+
+    // Sierpinski's seamless-wrap zoom phase: the fractional part of the
+    // accumulated log2 zoom depth, advancing at the same audio-reactive
+    // rate as every other dive so it stays musically in sync. Wrapping the
+    // exponent (instead of ever holding a huge zoom value) is what makes
+    // that dive literally infinite in plain float precision.
+    zoomPhase += (double) dt * -std::log2(rate);
+    zoomPhase -= std::floor(zoomPhase);
+
+    // Unbounded zoom scale for the exactly-self-similar IFS/DE presets
+    // (Sierpinski, Apollonian, Julia): multiplied down every frame just
+    // like FractalNavigator's viewRadius (same `rate`, so all the dive-
+    // style presets stay in sync with Zoom Speed/Camera Shake), NOT
+    // recomputed from a growing log-depth via exp() -- that would
+    // underflow float precision long before the scale itself needs to get
+    // that small. Reset far short of double-float's ~1e13 wall (with a
+    // safety margin, same reasoning as FractalNavigator's radiusFloor) so
+    // the loop-back happens while detail is still crisp.
+    ifsZoomScale *= std::pow(rate, (double) dt);
+    ifsTimeSinceReset += (double) dt;
+    constexpr double ifsZoomFloor = 1.0e-11;
+    if (ifsZoomScale < ifsZoomFloor)
+    {
+        ifsZoomScale = 1.0;
+        ifsTimeSinceReset = 0.0;
+    }
+}
+
+void VisualizerRenderer::uploadOrbitTextureIfDirty(FractalNavigator& nav, GLuint texture)
+{
+    if (! nav.consumeOrbitDirty())
+        return;
+    const int len = nav.referenceOrbitLength();
+    if (len <= 0)
+        return;
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, len, 1, GL_RGBA, GL_FLOAT, nav.referenceOrbitData().data());
 }
 
 void VisualizerRenderer::updateWaveformTexture()
@@ -536,15 +659,40 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     setU(u.cameraShake, params.cameraShake != nullptr ? params.cameraShake->load() : 1.0f);
     const float cameraScaleValue = params.cameraScale != nullptr ? params.cameraScale->load() : 1.0f;
     setU(u.cameraScale, cameraScaleValue);
+    setU(u.palette, params.palette != nullptr ? params.palette->load() : 0.0f);
 
-    const FractalNavigator& nav = presetIndex == burningShipPresetIndex ? burningShipNav : mandelbrotNav;
-    float reHi = 0.0f, reLo = 0.0f, imHi = 0.0f, imLo = 0.0f;
-    splitDouble(nav.centerX(), reHi, reLo);
-    splitDouble(nav.centerY(), imHi, imLo);
-    setU(u.fractalRe, reHi, reLo);
-    setU(u.fractalIm, imHi, imLo);
-    setU(u.fractalRadius, (float) (nav.radius() * cameraScaleValue));
-    setU(u.fractalFade, nav.fadeEnvelope());
+    float ifsZoomHi = 0.0f, ifsZoomLo = 0.0f;
+    ddToFloatPair(ddFromDouble(ifsZoomScale), ifsZoomHi, ifsZoomLo);
+    setU(u.ifsZoomScale, ifsZoomHi, ifsZoomLo);
+    const double ifsFadeT = juce::jlimit(0.0, 1.0, ifsTimeSinceReset / 1.5);
+    setU(u.ifsFade, (float) (ifsFadeT * ifsFadeT * (3.0 - 2.0 * ifsFadeT)));
+
+    setU(u.zoomPhase, (float) zoomPhase);
+
+    // Fractal slot uniforms: the active preset's own navigator if it has
+    // one, otherwise the first slot (harmless -- presets without a slot
+    // never read these uniforms).
+    FractalSlot* slot = slotForPreset(presetIndex);
+    if (slot == nullptr && ! fractalSlots.empty())
+        slot = &fractalSlots.front();
+
+    GLuint orbitTex = 0;
+    if (slot != nullptr)
+    {
+        const FractalNavigator& nav = slot->nav;
+        orbitTex = slot->texture;
+        // The manual explorers control zoom themselves -- Camera Scale
+        // stays an autopilot-preset convenience so it can't silently fight
+        // the wheel/arrow zoom.
+        const float radiusScale = slot->manual ? 1.0f : cameraScaleValue;
+        setU(u.fractalRadius, (float) nav.radius() * radiusScale);
+        setU(u.fractalFade, nav.fadeEnvelope());
+        setU(u.fractalOrbitLength, (float) nav.referenceOrbitLength());
+        float xHi = 0.0f, xLo = 0.0f, yHi = 0.0f, yLo = 0.0f;
+        nav.getReferenceOffset(xHi, xLo, yHi, yLo);
+        setU(u.fractalRefOffset, xHi, xLo, yHi, yLo);
+        setU(u.fractalIterNeed, nav.recommendedIterCap());
+    }
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, prevFrameTex);
@@ -553,6 +701,10 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, waveformTexture);
     setU(u.waveform, (GLint) 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, orbitTex);
+    setU(u.fractalOrbit, (GLint) 2);
 }
 
 void VisualizerRenderer::renderPresetToTarget(CompiledPreset& preset, juce::OpenGLFrameBuffer& target,

@@ -30,7 +30,18 @@ set_target_properties(KaleidosonicShaders PROPERTIES POSITION_INDEPENDENT_CODE O
 # ---------------------------------------------------------------------------
 # Plugin target
 # ---------------------------------------------------------------------------
+# App/installer icon: drop a square-ish PNG at Assets/logo.png and it's
+# picked up automatically on the next configure (JUCE generates the
+# Windows .ico for the Standalone exe from it). Absent file = no icon,
+# no error.
+set(KALEIDOSONIC_LOGO "${CMAKE_CURRENT_SOURCE_DIR}/Assets/logo.png")
+set(KALEIDOSONIC_ICON_ARGS "")
+if(EXISTS ${KALEIDOSONIC_LOGO})
+    set(KALEIDOSONIC_ICON_ARGS ICON_BIG "${KALEIDOSONIC_LOGO}" ICON_SMALL "${KALEIDOSONIC_LOGO}")
+endif()
+
 juce_add_plugin(Kaleidosonic
+    ${KALEIDOSONIC_ICON_ARGS}
     COMPANY_NAME "Kaleidosonic"
     PLUGIN_MANUFACTURER_CODE Klds
     PLUGIN_CODE Kal1

@@ -8,3 +8,4 @@ CMakeUserPresets.json
 .cache/
 _deps/
 *.log
+Installer/Output/

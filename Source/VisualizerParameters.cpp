@@ -39,6 +39,7 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::zoomWander, "Zoom Wander", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::cameraShake, "Camera Shake", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::cameraScale, "Camera Scale", 0.2f, 6.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::palette, "Palette", 0.0f, 8.0f, 0.0f));
 
     params.push_back(makeFloat(ParamIDs::trails, "Trails", 0.0f, 0.97f, 0.0f));
     params.push_back(makeFloat(ParamIDs::blur, "Blur", 0.0f, 1.0f, 0.0f));
@@ -76,6 +77,7 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     zoomWander              = apvts.getRawParameterValue(ParamIDs::zoomWander);
     cameraShake             = apvts.getRawParameterValue(ParamIDs::cameraShake);
     cameraScale             = apvts.getRawParameterValue(ParamIDs::cameraScale);
+    palette                 = apvts.getRawParameterValue(ParamIDs::palette);
 
     trails                  = apvts.getRawParameterValue(ParamIDs::trails);
     blur                    = apvts.getRawParameterValue(ParamIDs::blur);

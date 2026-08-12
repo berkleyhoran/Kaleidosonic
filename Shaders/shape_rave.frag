@@ -41,15 +41,22 @@ const float kCell = 3.0;
 
 // Distance to the nearest shape, in a cell-local frame. cellId (out) is
 // the repeated cell's integer coordinate, used to pick a stable per-cell
-// hue/shape/phase.
-float shapeField(vec3 p, float pulse, out vec3 cellId)
+// hue/shape/phase. cameraPos: the flight path weaves through the field
+// with no inherent guarantee it avoids any given cell's shape (jitter can
+// place one anywhere in its cell), so rather than steer the camera around
+// obstacles -- which reads as the camera visibly, mechanically dodging,
+// not as a natural flight path -- whichever shape is nearest the camera
+// fades smoothly out of existence as the camera approaches it, so the
+// path itself never has to change at all. It fades back in once the
+// camera has moved on.
+float shapeField(vec3 p, float pulse, vec3 cameraPos, out vec3 cellId)
 {
     vec3 cell = floor(p / kCell + 0.5);
     cellId = cell;
-    vec3 local = p - cell * kCell;
 
     vec3 jitter = (hash33(cell) - 0.5) * (kCell * 0.5);
-    local -= jitter;
+    vec3 shapeCenter = cell * kCell + jitter;
+    vec3 local = p - shapeCenter;
 
     float bob = sin(uTime * 0.6 + hash13(cell) * 30.0) * 0.35;
     local.y -= bob;
@@ -66,7 +73,13 @@ float shapeField(vec3 p, float pulse, out vec3 cellId)
     else
         d = sdSphere(local, 0.6);
 
-    return d * scale;
+    d *= scale;
+
+    float distToCamera = length(shapeCenter - cameraPos);
+    float presence = smoothstep(kCell * 0.3, kCell * 0.85, distToCamera);
+    d += (1.0 - presence) * 25.0; // pushes the faded shape's distance far away, not just its opacity
+
+    return d;
 }
 
 void main()
@@ -75,7 +88,10 @@ void main()
     float react = uReactivity;
 
     // Continuous forward flight, path gently weaving; onset gives the
-    // whole camera a kick, like the field is thumping.
+    // whole camera a kick, like the field is thumping. uTime itself
+    // already wraps every ~1000s (see common.glsl), which bounds travel
+    // to a range comfortably inside float32's precise-integer span
+    // regardless of session length.
     float speed = 1.4 + 1.6 * clamp(uZoomSpeed, 0.0, 1.0);
     float travel = uTime * speed;
     vec3 ro = vec3(sin(travel * 0.11) * 3.0, cos(travel * 0.09) * 2.0, travel);
@@ -92,48 +108,23 @@ void main()
 
     float pulse = uBass * react * 0.6 + uOnset * react * uCameraShake * 0.8;
 
-    // The flight path weaves through the field with no guarantee it
-    // avoids any given cell's shape (jitter can place a shape anywhere
-    // in its cell) -- without this, the camera would periodically fly
-    // straight into one, which reads as a checkerboard/black glitch
-    // (raymarching from inside or right at a surface is numerically
-    // unstable: the step size collapses toward zero and the glow term
-    // below spikes). Push the camera away from the nearest surface along
-    // its gradient before marching, so the ray always starts in clear
-    // space regardless of how the path happens to weave.
-    {
-        vec3 dummyCell;
-        for (int k = 0; k < 3; ++k)
-        {
-            float dHere = shapeField(ro, pulse, dummyCell);
-            if (dHere > 0.9)
-                break;
-            vec2 e2 = vec2(0.01, 0.0);
-            vec3 grad = normalize(vec3(
-                shapeField(ro + e2.xyy, pulse, dummyCell) - shapeField(ro - e2.xyy, pulse, dummyCell),
-                shapeField(ro + e2.yxy, pulse, dummyCell) - shapeField(ro - e2.yxy, pulse, dummyCell),
-                shapeField(ro + e2.yyx, pulse, dummyCell) - shapeField(ro - e2.yyx, pulse, dummyCell)) + 1.0e-4);
-            ro += grad * (0.9 - dHere);
-        }
-    }
-
     float t = 0.0;
     float glow = 0.0;
     bool hit = false;
     vec3 p = ro;
     vec3 hitCell = vec3(0.0);
-    for (int i = 0; i < 110; ++i)
+    for (int i = 0; i < 130; ++i)
     {
         p = ro + rd * t;
         vec3 cellId;
-        float d = shapeField(p, pulse, cellId);
+        float d = shapeField(p, pulse, ro, cellId);
         if (d < 0.0)
         {
-            // Grazed inside a surface despite the avoidance above (e.g. a
-            // shape bobbed/pulsed into the ray after the push) -- treat
-            // as an immediate hit rather than let the marcher bounce
-            // around near zero, which is what actually produced the
-            // checkerboard artifacting.
+            // Still possible at a grazing silhouette even with the fade
+            // above (a shape mid-fade, or one just past the fade radius)
+            // -- treat as an immediate hit rather than let the marcher
+            // bounce around near zero, which is what actually produced
+            // the checkerboard artifacting.
             hit = true;
             hitCell = cellId;
             break;
@@ -145,7 +136,7 @@ void main()
             hitCell = cellId;
             break;
         }
-        t += d * 0.7;
+        t += d * 0.65;
         if (t > 60.0)
             break;
     }
@@ -153,12 +144,19 @@ void main()
     vec3 col = vec3(0.01, 0.01, 0.02);
     if (hit)
     {
-        vec2 e = vec2(0.002, 0.0);
+        // A slightly wider epsilon than a typical raymarch normal here --
+        // shapeField's fade term has a smoothstep in it, which is gentler
+        // (less locally linear) than a plain SDF, so a too-tight epsilon
+        // was picking up on that curvature as normal noise right at
+        // silhouette edges of nearby shapes -- the other real source of
+        // the checkerboard complaint, distinct from the camera-embedding
+        // one the fade above already fixes.
+        vec2 e = vec2(0.004, 0.0);
         vec3 dummy;
         vec3 n = normalize(vec3(
-            shapeField(p + e.xyy, pulse, dummy) - shapeField(p - e.xyy, pulse, dummy),
-            shapeField(p + e.yxy, pulse, dummy) - shapeField(p - e.yxy, pulse, dummy),
-            shapeField(p + e.yyx, pulse, dummy) - shapeField(p - e.yyx, pulse, dummy)));
+            shapeField(p + e.xyy, pulse, ro, dummy) - shapeField(p - e.xyy, pulse, ro, dummy),
+            shapeField(p + e.yxy, pulse, ro, dummy) - shapeField(p - e.yxy, pulse, ro, dummy),
+            shapeField(p + e.yyx, pulse, ro, dummy) - shapeField(p - e.yyx, pulse, ro, dummy)));
 
         vec3 lightDir = normalize(vec3(0.4, 0.8, -0.3));
         float diff = max(dot(n, lightDir), 0.0);

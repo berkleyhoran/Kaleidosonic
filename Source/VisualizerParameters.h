@@ -76,7 +76,10 @@ namespace PresetNames
         "Audio Nebula",
         "Image Ripple",
         "Image Shatter",
-        "Image Kaleidoscope"
+        "Image Kaleidoscope",
+        "Shape Rave",
+        "Pipes",
+        "Infinite Maze"
     };
 }
 

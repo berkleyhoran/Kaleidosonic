@@ -11,7 +11,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **25 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **28 GLSL presets**, switchable and cross-fadable while the DAW automates
   them:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
@@ -79,6 +79,41 @@ Audio passes through completely unmodified — this is a pure visualizer.
     deliberately not an unbounded dive, since a plain texture sample has
     no fractal detail to reveal by going deeper. All three show a gentle
     pulsing placeholder until an image is actually loaded.
+  - **Shape Rave** — a raymarched field of rounded boxes, tori, and
+    spheres extending infinitely in every direction via domain repetition
+    (`mod`-folding the sample point back into one cell, like Mandelbox's
+    fold but a single wrap instead of an iterated one) -- no precision
+    machinery needed, the whole endless field costs the same as one cell.
+    The camera flies continuously through it; every shape bobs on its own
+    phase and scale-pulses on the beat. Since the flight path has no
+    guarantee it avoids any given shape (placement is randomized per
+    cell), the camera pushes itself away from the nearest surface along
+    its gradient each frame before marching -- without that, flying
+    straight into a shape is a real, if occasional, event, and
+    raymarching from inside/right at a surface is what produces
+    checkerboard-y noise (the step size collapses toward zero).
+  - **Pipes** — a homage to the classic Windows pipes screensaver. Five
+    pipes each grow one grid segment at a time, elbowing at right angles
+    only, until each fills its joint budget, holds a moment so the
+    finished shape actually reads, then clears and restarts with a new
+    color. The joint chain is raymarched as a run of capsules; the
+    leading segment interpolates smoothly toward its next joint every
+    frame (not just once fully grown) so the pipes visibly extrude rather
+    than popping into place in discrete unit-length jumps.
+  - **Infinite Maze** — a Wolfenstein-style autonomous walk through a
+    procedurally-hashed pillar maze that never repeats and needs no
+    storage at all: every cell's wall/open state is a pure function of
+    its integer grid coordinate, evaluated identically by the GPU's
+    rendering and by a lightweight CPU walker's navigation logic (an
+    ordinary 32-bit integer hash, not a float one -- the two sides must
+    never disagree about where a wall is, and integer ops are exact and
+    portable the way float transcendentals aren't). The walker turns at
+    junctions on its own (audio biases how eager it is to turn vs.
+    continue straight) and automatically teleports to a fresh area if it
+    ever finds itself in an isolated pocket with nowhere new to go.
+    Corridors are rendered wide with only thin pillars/wall-slabs (not
+    filling their whole grid cell) so the walk reads as roomy rather than
+    scraping the walls.
 - **Real-time audio analysis** (FFT-based): bass/mid/treble band energy,
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
   rolling waveform buffer, and **auto-gain** normalization so reactivity
@@ -157,6 +192,8 @@ Source/
                                    on the message thread, uploaded lazily on the GL thread
   Rendering/FractalNavigator.*    CPU boundary-bisection autopilot + manual explorer navigation
   Rendering/DoubleDouble.h        Double-double (~32 digit) CPU arithmetic for reference orbits
+  Rendering/PipeNetwork.*         Pipes preset: grows/animates the joint chains, no GPU precision needed
+  Rendering/MazeWalker.*          Infinite Maze preset: autonomous navigation through the hashed maze
 Shaders/
   common.glsl                Shared uniforms/helpers (double-float math,
                               perturbation core, palettes, fractal shading),
@@ -171,6 +208,7 @@ Shaders/
   oscilloscope.frag           waveform_scope.frag      fractal_bubbles.frag
   starfield_warp.frag         audio_nebula.frag
   image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
+  shape_rave.frag              pipes.frag                infinite_maze.frag
 ```
 
 The renderer pipeline is two stages: the selected preset (or two, cross-
@@ -216,7 +254,7 @@ standalone app at
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (25) | Selects the active shader preset |
+| Preset | choice (28) | Selects the active shader preset |
 | Preset Morph | 0–1 | Cross-fades toward the *next* preset in the list |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
 | Bass / Mid / Treble Gain | 0–2 each | Per-band weighting before it hits the shaders |

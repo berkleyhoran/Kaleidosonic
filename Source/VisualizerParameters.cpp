@@ -169,6 +169,15 @@ namespace
             /* 24 Image Kaleidoscope */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
               ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 25 Shape Rave */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::zoomSpeed,
+              ParamIDs::cameraShake, ParamIDs::palette },
+            /* 26 Pipes -- Zoom Speed/Camera Shake repurposed as pipe growth speed (no zoom of its own) */
+            { ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::zoomSpeed, ParamIDs::cameraShake,
+              ParamIDs::cameraScale, ParamIDs::palette },
+            /* 27 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::zoomSpeed,
+              ParamIDs::cameraShake, ParamIDs::palette },
         };
         return table;
     }

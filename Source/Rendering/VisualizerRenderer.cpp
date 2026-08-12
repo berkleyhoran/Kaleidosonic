@@ -381,6 +381,11 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     userImage               = makeUniformIfPresent(program, "uUserImage");
     userImageAspect         = makeUniformIfPresent(program, "uUserImageAspect");
     userImageLoaded         = makeUniformIfPresent(program, "uUserImageLoaded");
+    pipeJoints              = makeUniformIfPresent(program, "uPipeJoints");
+    pipeHuesA               = makeUniformIfPresent(program, "uPipeHuesA");
+    pipeHueE                = makeUniformIfPresent(program, "uPipeHueE");
+    mazePos                 = makeUniformIfPresent(program, "uMazePos");
+    mazeHeading             = makeUniformIfPresent(program, "uMazeHeading");
 }
 
 VisualizerRenderer::BlitUniforms::BlitUniforms(juce::OpenGLShaderProgram& program)
@@ -548,6 +553,19 @@ void VisualizerRenderer::newOpenGLContextCreated()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    // Pipes joint-position texture: one texel per joint, RGBA32F =
+    // (x, y, z, radius). Nearest + texelFetch, same reasoning as the
+    // fractal reference-orbit textures -- indexed exactly by integer
+    // joint, never sampled/interpolated.
+    glGenTextures(1, &pipeJointTexture);
+    glBindTexture(GL_TEXTURE_2D, pipeJointTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, PipeNetwork::textureWidth, 1, 0, GL_RGBA, GL_FLOAT,
+                 pipeNetwork.jointData().data());
     // A fresh GL context has no texture data regardless of what was
     // uploaded before (e.g. the host tore down and recreated the context);
     // if a picture was already loaded, force the next frame to re-upload
@@ -598,6 +616,12 @@ void VisualizerRenderer::openGLContextClosing()
     {
         glDeleteTextures(1, &userImageTexture);
         userImageTexture = 0;
+    }
+
+    if (pipeJointTexture != 0)
+    {
+        glDeleteTextures(1, &pipeJointTexture);
+        pipeJointTexture = 0;
     }
 
     for (auto& slot : fractalSlots)
@@ -686,6 +710,29 @@ void VisualizerRenderer::updateNavigators(float dt)
         uploadOrbitTextureIfDirty(slot.nav, slot.texture);
     }
 
+    // Pipes' growth speed: Zoom Speed and Camera Shake repurposed as
+    // "how fast things build" (Pipes has no zoom of its own), same
+    // audio-reactive shape as `rate` above but expressed directly as grid
+    // steps/second rather than a per-second shrink multiplier.
+    const double pipeGrowthRate = 3.2 + 5.5 * t
+                                 + (double) (analyzer.getBassAutoGain() * 2.0f + onsetEnvelope * 2.6f)
+                                       * (double) cameraShakeValue;
+    pipeNetwork.update((double) dt, pipeGrowthRate, navigatorRng);
+    uploadPipeTextureIfDirty();
+
+    // Maze walk speed/turn-bias: same repurposing idea as Pipes' growth
+    // rate above -- Zoom Speed becomes "how fast the walk moves", Camera
+    // Shake plus the audio envelope becomes "how eager it is to turn at
+    // a junction instead of continuing straight".
+    // mazeWalker moves in its own logical units (1 per hop); the shader
+    // renders those at a much wider physical pitch (see kPitch in
+    // infinite_maze.frag) for roomier corridors, so this constant is
+    // tuned down from what it'd be if it were directly a world-space
+    // speed, to land at a similar real pace despite that.
+    const double mazeSpeed = 0.8 + 1.4 * t + (double) (analyzer.getBassAutoGain() * 0.45f) * (double) cameraShakeValue;
+    const double mazeTurnBias = 0.3 + (double) (onsetEnvelope * 0.5f) * (double) cameraShakeValue;
+    mazeWalker.update((double) dt, mazeSpeed, mazeTurnBias, navigatorRng);
+
     // Sierpinski's seamless-wrap zoom phase: the fractional part of the
     // accumulated log2 zoom depth, advancing at the same audio-reactive
     // rate as every other dive so it stays musically in sync. Wrapping the
@@ -730,6 +777,15 @@ void VisualizerRenderer::updateWaveformTexture()
     glBindTexture(GL_TEXTURE_2D, waveformTexture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, AudioAnalyzer::waveformSize, 1, GL_RED, GL_FLOAT,
                      waveformSnapshot.data());
+}
+
+void VisualizerRenderer::uploadPipeTextureIfDirty()
+{
+    if (! pipeNetwork.consumeDirty())
+        return;
+    glBindTexture(GL_TEXTURE_2D, pipeJointTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, PipeNetwork::textureWidth, 1, GL_RGBA, GL_FLOAT,
+                    pipeNetwork.jointData().data());
 }
 
 void VisualizerRenderer::setSourceImage(const juce::Image& image)
@@ -887,6 +943,16 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     setU(u.userImage, (GLint) 3);
     setU(u.userImageAspect, userImageAspect);
     setU(u.userImageLoaded, userImageLoaded ? 1.0f : 0.0f);
+
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, pipeJointTexture);
+    setU(u.pipeJoints, (GLint) 4);
+    const auto& hues = pipeNetwork.hues();
+    setU(u.pipeHuesA, hues[0], hues[1], hues[2], hues[3]);
+    setU(u.pipeHueE, hues[4]);
+
+    setU(u.mazePos, mazeWalker.posX(), mazeWalker.posZ());
+    setU(u.mazeHeading, mazeWalker.headingX(), mazeWalker.headingZ());
 }
 
 void VisualizerRenderer::renderPresetToTarget(CompiledPreset& preset, juce::OpenGLFrameBuffer& target,

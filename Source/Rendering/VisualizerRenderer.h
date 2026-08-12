@@ -8,6 +8,8 @@
 #include "../AudioAnalyzer.h"
 #include "../VisualizerParameters.h"
 #include "FractalNavigator.h"
+#include "PipeNetwork.h"
+#include "MazeWalker.h"
 
 // Owns the OpenGLContext and does all GL work. Each frame:
 //   1. the current (and, while morphing, the next) preset renders into an
@@ -61,7 +63,8 @@ private:
             reactivity, zoomSpeed, rotationSpeed, hue, saturation, brightness, contrast, kaleidoscopeSegments,
             feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
             fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
-            ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded;
+            ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded, pipeJoints,
+            pipeHuesA, pipeHueE, mazePos, mazeHeading;
     };
 
     struct CompiledPreset
@@ -187,6 +190,20 @@ private:
     float userImageAspect = 1.0f;
     bool userImageLoaded = false;
     void uploadUserImageIfDirty();
+
+    // "Pipes" preset state (see PipeNetwork.h) -- grown each frame in
+    // updateNavigators() alongside the fractal navigators, uploaded to a
+    // small joint-position texture the same way the reference orbits are.
+    PipeNetwork pipeNetwork;
+    GLuint pipeJointTexture = 0;
+    void uploadPipeTextureIfDirty();
+
+    // "Infinite Maze" preset state (see MazeWalker.h) -- advanced each
+    // frame alongside the other navigators. No GPU upload needed at all:
+    // just the walker's position/heading as plain uniforms, since the
+    // maze itself is a pure function of grid coordinates evaluated
+    // independently (and identically) on both sides.
+    MazeWalker mazeWalker;
 
     double startTimeMs = 0.0;
     double lastFrameTimeMs = 0.0;

@@ -32,6 +32,9 @@ namespace
         { BinaryData::image_ripple_frag,       BinaryData::image_ripple_fragSize },
         { BinaryData::image_shatter_frag,      BinaryData::image_shatter_fragSize },
         { BinaryData::image_kaleidoscope_frag, BinaryData::image_kaleidoscope_fragSize },
+        { BinaryData::shape_rave_frag,         BinaryData::shape_rave_fragSize },
+        { BinaryData::pipes_frag,              BinaryData::pipes_fragSize },
+        { BinaryData::infinite_maze_frag,      BinaryData::infinite_maze_fragSize },
     };
 
     constexpr int numPresets = (int) (sizeof(presetResources) / sizeof(Resource));

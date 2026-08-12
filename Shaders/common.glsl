@@ -93,6 +93,22 @@ uniform sampler2D uUserImage;
 uniform float uUserImageAspect;
 uniform float uUserImageLoaded;
 
+// "Pipes" preset joint positions (see Source/Rendering/PipeNetwork.h): one
+// texel per joint, (x, y, z, radius), PipeNetwork::textureWidth texels
+// wide. uPipeHuesA/uPipeHueE give each of the 5 pipes its own palette
+// phase (4 packed in the vec4, the 5th its own float -- there's no vec5).
+uniform sampler2D uPipeJoints;
+uniform vec4 uPipeHuesA;
+uniform float uPipeHueE;
+
+// "Infinite Maze" preset camera state (see Source/Rendering/MazeWalker.h):
+// world-space (x, z) position and normalized (x, z) facing direction. No
+// texture needed -- the maze itself is a pure function of grid
+// coordinates, evaluated identically (and independently) by the CPU
+// navigation logic and infinite_maze.frag's rendering.
+uniform vec2 uMazePos;
+uniform vec2 uMazeHeading;
+
 vec3 hsv2rgb(vec3 c)
 {
     vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);

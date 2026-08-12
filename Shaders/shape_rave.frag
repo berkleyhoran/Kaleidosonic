@@ -7,6 +7,24 @@
 // Burning Ship 3D get endless detail for free from their fold instead of
 // from deep zoom. The camera flies continuously through the field; each
 // shape bobs on its own phase and scale-pulses on the beat.
+//
+// The flight path has no inherent guarantee it avoids any given cell's
+// shape (jitter can place one anywhere in its cell). Two things were
+// tried and discarded before this one: steering the camera away from
+// whatever it was about to hit (reads as the camera visibly, mechanically
+// dodging -- not a natural flight path), and fading a nearby shape's
+// distance value toward "very far away" as the camera approached (looks
+// right in principle, but *inflating* the value a raymarcher uses for its
+// own step size is a real raymarching mistake -- a step near the camera
+// suddenly sized for a "shape" 25 units away massively overshoots
+// whatever real geometry is actually close by, which is exactly what
+// produced the checkerboard-y noise). The fix that's actually correct for
+// a raymarcher: carve a literal tube-shaped void out of the whole field
+// along the flight path, via ordinary CSG subtraction (`max(shape, -void)`,
+// the standard, safe way to remove one shape from another in a distance
+// field -- it never touches step-size validity). The path is
+// simply always clear, by construction, everywhere along its length --
+// nothing to fade, nothing to dodge, and nothing shape-specific to break.
 
 float hash13(vec3 p)
 {
@@ -38,18 +56,20 @@ float sdSphere(vec3 p, float r)
 }
 
 const float kCell = 3.0;
+const float kTubeRadius = 1.7; // comfortably past the largest shape's ~0.8 radius plus flight margin
 
-// Distance to the nearest shape, in a cell-local frame. cellId (out) is
-// the repeated cell's integer coordinate, used to pick a stable per-cell
-// hue/shape/phase. cameraPos: the flight path weaves through the field
-// with no inherent guarantee it avoids any given cell's shape (jitter can
-// place one anywhere in its cell), so rather than steer the camera around
-// obstacles -- which reads as the camera visibly, mechanically dodging,
-// not as a natural flight path -- whichever shape is nearest the camera
-// fades smoothly out of existence as the camera approaches it, so the
-// path itself never has to change at all. It fades back in once the
-// camera has moved on.
-float shapeField(vec3 p, float pulse, vec3 cameraPos, out vec3 cellId)
+// The flight path's own (x, y) at a given z/travel -- kept as a function
+// so shapeField can carve clearance around it without needing the
+// camera's instantaneous position at all. Must match main()'s `ro`.
+vec2 flightPathXY(float z)
+{
+    return vec2(sin(z * 0.11) * 3.0, cos(z * 0.09) * 2.0);
+}
+
+// Distance to the nearest shape, in a cell-local frame, with the flight
+// path's tube subtracted out. cellId (out) is the repeated cell's integer
+// coordinate, used to pick a stable per-cell hue/shape/phase.
+float shapeField(vec3 p, float pulse, out vec3 cellId)
 {
     vec3 cell = floor(p / kCell + 0.5);
     cellId = cell;
@@ -75,11 +95,8 @@ float shapeField(vec3 p, float pulse, vec3 cameraPos, out vec3 cellId)
 
     d *= scale;
 
-    float distToCamera = length(shapeCenter - cameraPos);
-    float presence = smoothstep(kCell * 0.3, kCell * 0.85, distToCamera);
-    d += (1.0 - presence) * 25.0; // pushes the faded shape's distance far away, not just its opacity
-
-    return d;
+    float tubeSdf = length(p.xy - flightPathXY(p.z)) - kTubeRadius; // negative inside the tube
+    return max(d, -tubeSdf);
 }
 
 void main()
@@ -94,9 +111,8 @@ void main()
     // regardless of session length.
     float speed = 1.4 + 1.6 * clamp(uZoomSpeed, 0.0, 1.0);
     float travel = uTime * speed;
-    vec3 ro = vec3(sin(travel * 0.11) * 3.0, cos(travel * 0.09) * 2.0, travel);
-    vec3 lookAt = ro + vec3(sin((travel + 4.0) * 0.11) * 3.0 - sin(travel * 0.11) * 3.0,
-                             cos((travel + 4.0) * 0.09) * 2.0 - cos(travel * 0.09) * 2.0, 4.0);
+    vec3 ro = vec3(flightPathXY(travel), travel);
+    vec3 lookAt = vec3(flightPathXY(travel + 4.0), travel + 4.0);
 
     vec3 forward = normalize(lookAt - ro);
     vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
@@ -113,50 +129,52 @@ void main()
     bool hit = false;
     vec3 p = ro;
     vec3 hitCell = vec3(0.0);
-    for (int i = 0; i < 130; ++i)
+    float lastD = 1.0e9;
+    for (int i = 0; i < 140; ++i)
     {
         p = ro + rd * t;
         vec3 cellId;
-        float d = shapeField(p, pulse, ro, cellId);
-        if (d < 0.0)
+        float d = shapeField(p, pulse, cellId);
+        hitCell = cellId;
+        lastD = d;
+
+        // Glow only accumulates while comfortably clear of any surface.
+        // Ungated, the many tiny near-surface steps a converging ray takes
+        // right before landing were adding a per-pixel-varying halo ON the
+        // surface itself -- the ripply "fingerprint" contour texture on
+        // close shapes, since neighboring pixels' rays take different
+        // near-surface step counts.
+        if (d > 0.15)
+            glow += min(0.0012 / (0.02 + d * d * 3.0), 0.05);
+
+        // Hit tolerance relaxes with distance along the ray (standard
+        // pixel-footprint scaling): silhouette-grazing rays converge and
+        // shade instead of running out of iterations and speckling.
+        float eps = 0.0012 + t * 0.0007;
+        if (d < eps)
         {
-            // Still possible at a grazing silhouette even with the fade
-            // above (a shape mid-fade, or one just past the fade radius)
-            // -- treat as an immediate hit rather than let the marcher
-            // bounce around near zero, which is what actually produced
-            // the checkerboard artifacting.
             hit = true;
-            hitCell = cellId;
             break;
         }
-        glow += min(0.0015 / (0.02 + d * d * 3.0), 0.06);
-        if (d < 0.0015)
-        {
-            hit = true;
-            hitCell = cellId;
-            break;
-        }
-        t += d * 0.65;
+        t += d * 0.8;
         if (t > 60.0)
             break;
     }
+    // Ran out of iterations while nearly touching a surface (grazing
+    // silhouettes do this): shade it as a hit rather than leaving a
+    // background-colored speckle punched into the edge.
+    if (! hit && lastD < 0.06)
+        hit = true;
 
     vec3 col = vec3(0.01, 0.01, 0.02);
     if (hit)
     {
-        // A slightly wider epsilon than a typical raymarch normal here --
-        // shapeField's fade term has a smoothstep in it, which is gentler
-        // (less locally linear) than a plain SDF, so a too-tight epsilon
-        // was picking up on that curvature as normal noise right at
-        // silhouette edges of nearby shapes -- the other real source of
-        // the checkerboard complaint, distinct from the camera-embedding
-        // one the fade above already fixes.
-        vec2 e = vec2(0.004, 0.0);
+        vec2 e = vec2(0.0025, 0.0);
         vec3 dummy;
         vec3 n = normalize(vec3(
-            shapeField(p + e.xyy, pulse, ro, dummy) - shapeField(p - e.xyy, pulse, ro, dummy),
-            shapeField(p + e.yxy, pulse, ro, dummy) - shapeField(p - e.yxy, pulse, ro, dummy),
-            shapeField(p + e.yyx, pulse, ro, dummy) - shapeField(p - e.yyx, pulse, ro, dummy)));
+            shapeField(p + e.xyy, pulse, dummy) - shapeField(p - e.xyy, pulse, dummy),
+            shapeField(p + e.yxy, pulse, dummy) - shapeField(p - e.yxy, pulse, dummy),
+            shapeField(p + e.yyx, pulse, dummy) - shapeField(p - e.yyx, pulse, dummy)));
 
         vec3 lightDir = normalize(vec3(0.4, 0.8, -0.3));
         float diff = max(dot(n, lightDir), 0.0);

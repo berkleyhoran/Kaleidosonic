@@ -73,11 +73,34 @@ namespace PresetNames
         "Buffalo Fractal",
         "Tricorn",
         "Burning Ship 3D",
-        "Audio Nebula"
+        "Audio Nebula",
+        "Image Ripple",
+        "Image Shatter",
+        "Image Kaleidoscope"
     };
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+// Groups the sliders in the editor's control panel into collapsible
+// sections. Order here is display order. Preset/Preset Morph are handled
+// separately by the editor (always visible, above these groups).
+struct ParamGroupInfo
+{
+    juce::String title;
+    std::vector<juce::String> paramIDs;
+};
+const std::vector<ParamGroupInfo>& paramGroups();
+
+// Whether paramID has any actual effect on the currently selected preset --
+// grounded in the real shader/renderer code (which uniforms each preset's
+// .frag file and the common.glsl helpers it calls actually read, plus the
+// few parameters, like Zoom Speed for the autopilot/IFS-zoom presets, that
+// are only consumed in C++ before ever reaching a shader). Used purely for
+// the editor's "grey out what doesn't apply" display -- irrelevant params
+// stay fully functional (e.g. so automation written for one preset doesn't
+// silently stop working if a Preset Morph briefly shows another).
+bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID);
 
 // Cached raw pointers into the APVTS for lock-free reads from the audio
 // and render threads. Populated once after the APVTS is constructed.

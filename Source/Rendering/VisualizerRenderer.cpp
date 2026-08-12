@@ -378,6 +378,9 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     ifsZoomScale            = makeUniformIfPresent(program, "uIfsZoomScale");
     ifsFade                 = makeUniformIfPresent(program, "uIfsFade");
     zoomPhase               = makeUniformIfPresent(program, "uZoomPhase");
+    userImage               = makeUniformIfPresent(program, "uUserImage");
+    userImageAspect         = makeUniformIfPresent(program, "uUserImageAspect");
+    userImageLoaded         = makeUniformIfPresent(program, "uUserImageLoaded");
 }
 
 VisualizerRenderer::BlitUniforms::BlitUniforms(juce::OpenGLShaderProgram& program)
@@ -538,6 +541,23 @@ void VisualizerRenderer::newOpenGLContextCreated()
                             slot.nav.referenceOrbitData().data());
     }
 
+    glGenTextures(1, &userImageTexture);
+    glBindTexture(GL_TEXTURE_2D, userImageTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    // A fresh GL context has no texture data regardless of what was
+    // uploaded before (e.g. the host tore down and recreated the context);
+    // if a picture was already loaded, force the next frame to re-upload
+    // it rather than silently going blank.
+    {
+        std::lock_guard<std::mutex> lock(userImageMutex);
+        if (userImageLoaded && ! pendingImagePixels.empty())
+            userImageDirty = true;
+    }
+
     lastWidth = lastHeight = 0;
     startTimeMs = juce::Time::getMillisecondCounterHiRes();
     lastFrameTimeMs = startTimeMs;
@@ -572,6 +592,12 @@ void VisualizerRenderer::openGLContextClosing()
     {
         glDeleteTextures(1, &waveformTexture);
         waveformTexture = 0;
+    }
+
+    if (userImageTexture != 0)
+    {
+        glDeleteTextures(1, &userImageTexture);
+        userImageTexture = 0;
     }
 
     for (auto& slot : fractalSlots)
@@ -706,6 +732,78 @@ void VisualizerRenderer::updateWaveformTexture()
                      waveformSnapshot.data());
 }
 
+void VisualizerRenderer::setSourceImage(const juce::Image& image)
+{
+    // Runs on the message thread (the editor's FileChooser callback, or
+    // the constructor reloading a previously-saved path) -- all the CPU
+    // decode work happens here, deliberately, so the GL thread only ever
+    // has to do the actual upload.
+    if (! image.isValid())
+        return;
+
+    const auto argb = image.convertedToFormat(juce::Image::ARGB);
+    const int w = argb.getWidth();
+    const int h = argb.getHeight();
+    if (w <= 0 || h <= 0)
+        return;
+
+    std::vector<juce::uint8> pixels((size_t) w * (size_t) h * 4);
+    {
+        const juce::Image::BitmapData bd(argb, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < h; ++y)
+        {
+            const auto* row = reinterpret_cast<const juce::PixelARGB*>(bd.getLinePointer(y));
+            juce::uint8* out = pixels.data() + (size_t) y * (size_t) w * 4;
+            for (int x = 0; x < w; ++x)
+            {
+                const auto& px = row[x];
+                out[x * 4 + 0] = px.getRed();
+                out[x * 4 + 1] = px.getGreen();
+                out[x * 4 + 2] = px.getBlue();
+                out[x * 4 + 3] = px.getAlpha();
+            }
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(userImageMutex);
+    pendingImagePixels = std::move(pixels);
+    pendingImageWidth = w;
+    pendingImageHeight = h;
+    userImageDirty = true;
+    userImageLoaded = true;
+    userImageAspect = (float) w / (float) juce::jmax(h, 1);
+}
+
+void VisualizerRenderer::uploadUserImageIfDirty()
+{
+    // GL thread. userImageTexture is only 0 before the first
+    // newOpenGLContextCreated() -- guard rather than upload into "no
+    // texture bound".
+    if (userImageTexture == 0)
+        return;
+
+    int w = 0, h = 0;
+    const juce::uint8* data = nullptr;
+    std::vector<juce::uint8> localCopy; // keeps data valid after the lock releases
+
+    {
+        std::lock_guard<std::mutex> lock(userImageMutex);
+        if (! userImageDirty)
+            return;
+        localCopy = pendingImagePixels; // small relative to a one-off image load; keeps the mutex held time short
+        w = pendingImageWidth;
+        h = pendingImageHeight;
+        userImageDirty = false;
+    }
+
+    if (w <= 0 || h <= 0 || localCopy.empty())
+        return;
+    data = localCopy.data();
+
+    glBindTexture(GL_TEXTURE_2D, userImageTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+}
+
 void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTex, float onsetEnv, int presetIndex)
 {
     setU(u.resolution, frameWidth, frameHeight);
@@ -783,6 +881,12 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, orbitTex);
     setU(u.fractalOrbit, (GLint) 2);
+
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, userImageTexture);
+    setU(u.userImage, (GLint) 3);
+    setU(u.userImageAspect, userImageAspect);
+    setU(u.userImageLoaded, userImageLoaded ? 1.0f : 0.0f);
 }
 
 void VisualizerRenderer::renderPresetToTarget(CompiledPreset& preset, juce::OpenGLFrameBuffer& target,
@@ -835,6 +939,7 @@ void VisualizerRenderer::renderOpenGL()
     onsetEnvelope = std::max(onsetEnvelope * decay, onsetPulse);
 
     updateWaveformTexture();
+    uploadUserImageIfDirty();
     updateNavigators(dt);
 
     const int numPresets = (int) presets.size();

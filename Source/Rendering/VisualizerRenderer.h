@@ -2,7 +2,9 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <mutex>
 #include <random>
+#include <vector>
 #include "../AudioAnalyzer.h"
 #include "../VisualizerParameters.h"
 #include "FractalNavigator.h"
@@ -36,6 +38,15 @@ public:
     void requestManualZoom(float steps);                 // +steps zooms in, -steps zooms out
     void requestManualPan(float dxFraction, float dyFraction); // fractions of the current view radius
 
+    // Hands a freshly-loaded picture (Load Image... in the editor) to the
+    // image-reactive presets. Safe to call from the message thread at any
+    // time, including before the GL context exists -- the actual texture
+    // upload happens lazily on the GL thread, the first renderOpenGL()
+    // after this. Decoding to a raw RGBA buffer happens here, synchronously
+    // on the caller's thread (cheap relative to a user's one-off file
+    // picker action; keeps the GL thread free of image-decode work).
+    void setSourceImage(const juce::Image& image);
+
     // juce::OpenGLRenderer
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
@@ -50,7 +61,7 @@ private:
             reactivity, zoomSpeed, rotationSpeed, hue, saturation, brightness, contrast, kaleidoscopeSegments,
             feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
             fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
-            ifsZoomScale, ifsFade, zoomPhase;
+            ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded;
     };
 
     struct CompiledPreset
@@ -160,6 +171,22 @@ private:
     GLuint dummyVAO = 0;
     GLuint waveformTexture = 0;
     std::array<float, (size_t) AudioAnalyzer::waveformSize> waveformSnapshot {};
+
+    // User-uploaded image (Load Image... in the editor) for the
+    // image-reactive presets. setSourceImage() (message thread) decodes
+    // to a raw RGBA buffer and stashes it here under the mutex;
+    // uploadUserImageIfDirty() (GL thread, once per frame) picks it up
+    // and does the actual glTexImage2D call. This is the only cross-
+    // thread handoff in the renderer -- everything else here already
+    // runs entirely on the GL thread.
+    std::mutex userImageMutex;
+    std::vector<juce::uint8> pendingImagePixels;
+    int pendingImageWidth = 0, pendingImageHeight = 0;
+    bool userImageDirty = false;
+    GLuint userImageTexture = 0;
+    float userImageAspect = 1.0f;
+    bool userImageLoaded = false;
+    void uploadUserImageIfDirty();
 
     double startTimeMs = 0.0;
     double lastFrameTimeMs = 0.0;

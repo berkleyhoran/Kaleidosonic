@@ -1,4 +1,5 @@
 #include "VisualizerParameters.h"
+#include <algorithm>
 
 using Layout = juce::AudioProcessorValueTreeState::ParameterLayout;
 
@@ -58,6 +59,143 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::gummy, "Gummy", 0.0f, 1.0f, 0.0f));
 
     return { params.begin(), params.end() };
+}
+
+const std::vector<ParamGroupInfo>& paramGroups()
+{
+    static const std::vector<ParamGroupInfo> groups {
+        { "Audio Reactivity", { ParamIDs::reactivity, ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain } },
+        { "Motion & Zoom", { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
+                              ParamIDs::cameraScale, ParamIDs::zoomWander } },
+        { "Fractal Detail", { ParamIDs::iterations, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion,
+                               ParamIDs::feedbackAmount } },
+        { "Color", { ParamIDs::hue, ParamIDs::saturation, ParamIDs::brightness, ParamIDs::contrast,
+                      ParamIDs::palette } },
+        { "Post FX: Trails & Flame", { ParamIDs::trails, ParamIDs::trailDirection, ParamIDs::flame } },
+        { "Post FX: Filters", { ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::shine,
+                                 ParamIDs::gummy, ParamIDs::posterize, ParamIDs::fisheye,
+                                 ParamIDs::chromaticAberration } },
+        { "Post FX: Glow & Cycle", { ParamIDs::bloomIntensity, ParamIDs::vignette, ParamIDs::colorCycleSpeed,
+                                      ParamIDs::pulseDepth } },
+    };
+    return groups;
+}
+
+namespace
+{
+    // Grounded in the actual shaders: which conditionally-relevant params
+    // (i.e. not one of the always-relevant ones below) each preset's .frag
+    // file -- and the common.glsl helpers it calls (fractalLayer/
+    // exploreFractal/perturbEscapeTime for the escape-time presets) --
+    // actually reads, plus the handful (Zoom Speed for the autopilot/
+    // IFS-style presets) that are only ever consumed in C++ before
+    // reaching a shader at all. Index matches PresetNames::all. Rebuilt by
+    // hand from `grep` over Shaders/*.frag any time a preset's uniform
+    // usage changes -- see the comment on isParamRelevantForPreset.
+    const std::vector<std::vector<juce::String>>& conditionalRelevance()
+    {
+        static const std::vector<std::vector<juce::String>> table {
+            /* 0  Mandelbrot Pulse */
+            { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
+              ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 1  Julia Kaleidoscope */
+            { ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion, ParamIDs::zoomWander,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 2  Plasma Feedback */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
+              ParamIDs::rotationSpeed, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::feedbackAmount },
+            /* 3  IFS Tunnel */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
+              ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::cameraScale },
+            /* 4  Tunnel Spiral */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake,
+              ParamIDs::cameraScale },
+            /* 5  Burning Ship */
+            { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
+              ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 6  Apollonian Gasket */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
+              ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion, ParamIDs::zoomWander,
+              ParamIDs::cameraShake, ParamIDs::cameraScale },
+            /* 7  Raymarch Tunnel 3D */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
+              ParamIDs::rotationSpeed, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
+            /* 8  Particle Bloom */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
+              ParamIDs::kaleidoscopeSegments, ParamIDs::cameraScale },
+            /* 9  Oscilloscope Glow */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::kaleidoscopeSegments, ParamIDs::distortion },
+            /* 10 Waveform Scope */
+            { ParamIDs::trebleGain },
+            /* 11 Sierpinski Triforce */
+            { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 12 Fractal Bubbles */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
+              ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale },
+            /* 13 Starfield Warp */
+            { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::zoomWander, ParamIDs::cameraShake,
+              ParamIDs::cameraScale },
+            /* 14 Mandelbox */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 15 Mandelbrot Explorer */
+            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            /* 16 Burning Ship Explorer */
+            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            /* 17 Perpendicular Ship */
+            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            /* 18 Buffalo Fractal */
+            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            /* 19 Tricorn */
+            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            /* 20 Burning Ship 3D */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::iterations,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 21 Audio Nebula */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 22 Image Ripple */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion,
+              ParamIDs::cameraScale, ParamIDs::palette },
+            /* 23 Image Shatter */
+            { ParamIDs::bassGain, ParamIDs::distortion, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 24 Image Kaleidoscope */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
+              ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+        };
+        return table;
+    }
+}
+
+bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID)
+{
+    // Always relevant, for every preset: color grading (every preset's main()
+    // ends by calling grade(), directly or via exploreFractal) and every
+    // global post-FX parameter (the post pass runs after whichever preset
+    // rendered, regardless of what that preset used).
+    static const std::vector<juce::String> alwaysRelevant {
+        ParamIDs::reactivity, ParamIDs::hue, ParamIDs::saturation, ParamIDs::brightness, ParamIDs::contrast,
+        ParamIDs::trails, ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::bloomIntensity,
+        ParamIDs::vignette, ParamIDs::chromaticAberration, ParamIDs::colorCycleSpeed, ParamIDs::pulseDepth,
+        ParamIDs::posterize, ParamIDs::fisheye, ParamIDs::trailDirection, ParamIDs::flame, ParamIDs::shine,
+        ParamIDs::gummy,
+    };
+    if (std::find(alwaysRelevant.begin(), alwaysRelevant.end(), paramID) != alwaysRelevant.end())
+        return true;
+
+    const auto& table = conditionalRelevance();
+    if (presetIndex < 0 || (size_t) presetIndex >= table.size())
+        return true; // unknown index -- fail open rather than grey out incorrectly
+
+    const auto& relevant = table[(size_t) presetIndex];
+    return std::find(relevant.begin(), relevant.end(), paramID) != relevant.end();
 }
 
 void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)

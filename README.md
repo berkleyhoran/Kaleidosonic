@@ -11,7 +11,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **22 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **25 GLSL presets**, switchable and cross-fadable while the DAW automates
   them:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
@@ -62,6 +62,23 @@ Audio passes through completely unmodified — this is a pure visualizer.
     amplitude so the clouds physically churn on the low end, treble adds a
     fine shimmer octave, and onsets flash lightning through the cloud body
     along ridged-noise filaments.
+  - **Image Ripple / Image Shatter / Image Kaleidoscope** — three presets
+    built around a picture you load yourself ("Load Image..." in the
+    control panel; the file path is remembered across sessions). Ripple
+    displaces the image in concentric sine rings like water, bass driving
+    a slow swell and treble a fine ripple, with onsets spawning fresh
+    expanding rings and a chromatic offset scaled by local ripple
+    strength. Shatter breaks the picture into a voronoi field of glass
+    shards that spring-kick apart on each onset and settle back (the
+    settle is free — `uOnset` is already a decaying envelope, see
+    VisualizerRenderer's onsetEnvelope) with crisp crack lines between
+    them; Distortion controls shard density. Kaleidoscope folds the image
+    through the usual mirror segments and tiles it (adjacent tiles
+    mirrored so a non-tileable photo still joins seamlessly) into an
+    endless mosaic tunnel with a bounded bass-driven breathing zoom --
+    deliberately not an unbounded dive, since a plain texture sample has
+    no fractal detail to reveal by going deeper. All three show a gentle
+    pulsing placeholder until an image is actually loaded.
 - **Real-time audio analysis** (FFT-based): bass/mid/treble band energy,
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
   rolling waveform buffer, and **auto-gain** normalization so reactivity
@@ -80,12 +97,20 @@ Audio passes through completely unmodified — this is a pure visualizer.
   milky response lift, so the whole image reads as translucent, lit
   jelly. All three are 0 by default and layer on top of *any* preset.
 - **Manual control panel** (collapsible, scrollable, opaque backdrop so
-  labels stay readable over any visual) with a slider for every parameter.
-  Sliders deliberately ignore the mouse wheel so wheel-scrolling the panel
-  never yanks values.
+  labels stay readable over any visual) with a slider for every parameter,
+  organized into collapsible sections (Audio Reactivity, Motion & Zoom,
+  Fractal Detail, Color, three Post FX groups) — click a section header to
+  fold it away. Whichever sliders the *current* preset's shader doesn't
+  actually read are dimmed (grounded in the real per-preset uniform usage,
+  see `isParamRelevantForPreset` in
+  [VisualizerParameters.cpp](Source/VisualizerParameters.cpp)) so it's
+  obvious at a glance what's worth touching — dimmed controls stay fully
+  functional, since switching presets or a Preset Morph can make them
+  matter again. Sliders deliberately ignore the mouse wheel so
+  wheel-scrolling the panel never yanks values.
 - **Explorer navigation**: on the explorer presets, mouse wheel / Up-Down
   arrows zoom and dragging the visual pans; over the panel the wheel just
-  scrolls the panel.
+  scrolls the panel. `[`/`]` step through presets from anywhere.
 - **Fullscreen toggle** (button or `F` key, `Esc` to exit).
 - Builds as **VST3** and **Standalone** (JUCE multi-format target).
 
@@ -127,7 +152,9 @@ Source/
   AudioAnalyzer.*           FFT band energy + onset detection (audio thread)
   VisualizerParameters.*    APVTS parameter layout (the automation surface)
   Presets/PresetManager.*   Maps preset index -> GLSL source (BinaryData)
-  Rendering/VisualizerRenderer.*  OpenGL context, FBOs, per-frame uniforms, fractal slots
+  Rendering/VisualizerRenderer.*  OpenGL context, FBOs, per-frame uniforms, fractal slots,
+                                   and the user-image GL texture (Load Image...) -- decoded
+                                   on the message thread, uploaded lazily on the GL thread
   Rendering/FractalNavigator.*    CPU boundary-bisection autopilot + manual explorer navigation
   Rendering/DoubleDouble.h        Double-double (~32 digit) CPU arithmetic for reference orbits
 Shaders/
@@ -143,6 +170,7 @@ Shaders/
   tunnel_spiral.frag          raymarch_tunnel.frag     particle_bloom.frag
   oscilloscope.frag           waveform_scope.frag      fractal_bubbles.frag
   starfield_warp.frag         audio_nebula.frag
+  image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
 ```
 
 The renderer pipeline is two stages: the selected preset (or two, cross-
@@ -188,7 +216,7 @@ standalone app at
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (22) | Selects the active shader preset |
+| Preset | choice (25) | Selects the active shader preset |
 | Preset Morph | 0–1 | Cross-fades toward the *next* preset in the list |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
 | Bass / Mid / Treble Gain | 0–2 each | Per-band weighting before it hits the shaders |
@@ -236,12 +264,23 @@ standalone app at
    in the same order.
 4. If it's an escape-time fractal needing a navigator, add a `FractalSlot`
    in `VisualizerRenderer`'s constructor with its preset index and formula.
-5. Re-run CMake configure (new shader files need to be picked up by the
+5. Add an entry to the relevance table in `conditionalRelevance()`
+   ([Source/VisualizerParameters.cpp](Source/VisualizerParameters.cpp)),
+   listing which of the conditionally-relevant parameters your preset's
+   shader (and any common.glsl helpers it calls) actually reads — this is
+   what the editor dims when it doesn't apply. Missing an entry fails open
+   (nothing gets dimmed for that preset) rather than dimming incorrectly.
+6. Re-run CMake configure (new shader files need to be picked up by the
    `file(GLOB ...)` in `CMakeLists.txt`) and rebuild.
 
 ## Known follow-ups
 
-- No preset persistence beyond the host's own automation/session state yet.
+- Parameter values persist via the host's own automation/session state, as
+  normal for a VST3; the picture loaded via "Load Image..." additionally
+  persists its file path as a plain property on the same saved state (see
+  `PluginProcessor::getImagePath`/`setImagePath`), so it reloads with the
+  session -- but only the path, not the image data itself, so it won't
+  travel with the project if you move it to a machine without that file.
 - Audio-reactivity coefficients were tuned by inspection, not against real
   program material — Reactivity and the per-band Gains are the first knobs
   to adjust if everything under-/over-reacts to your mix.

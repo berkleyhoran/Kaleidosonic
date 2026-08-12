@@ -83,6 +83,16 @@ uniform float uZoomPhase;
 uniform sampler2D uPrevFrame;    // previous rendered frame, for feedback presets
 uniform sampler2D uWaveform;     // 2048x1 R32F texture of recent mono samples, oldest at x=0
 
+// User-uploaded picture (Load Image... in the editor), for the
+// image-reactive presets. uUserImageLoaded is 0 until something is
+// actually loaded, so presets can show a placeholder instead of sampling
+// garbage; uUserImageAspect is width/height, used by imageContainUV below
+// to letterbox the picture so the whole thing is always visible regardless
+// of the plugin window's aspect ratio.
+uniform sampler2D uUserImage;
+uniform float uUserImageAspect;
+uniform float uUserImageLoaded;
+
 vec3 hsv2rgb(vec3 c)
 {
     vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -430,6 +440,44 @@ vec3 fractalLayer(vec2 uv, int variant, float radiusMultiplier, float hueShift)
     float crease = smoothstep(0.0, 3.0, edge);
 
     return col * shade * mix(0.08, 1.0, crease);
+}
+
+// ---------------------------------------------------------------------
+// User-image helpers, shared by the image-reactive presets.
+
+// Maps aspect-corrected, centered screen coordinates (the standard
+// `(vUv-0.5)*vec2(uResolution.x/uResolution.y,1.0)` pattern every other
+// preset already uses) onto the uploaded image's own 0..1 UV space, fit
+// so the whole picture is always visible ("contain"/letterbox) no matter
+// how the plugin window's aspect ratio compares to the image's.
+vec2 imageContainUV(vec2 screenUV, float imageAspect)
+{
+    vec2 half = imageAspect > 1.0 ? vec2(imageAspect, 1.0) : vec2(1.0, 1.0 / imageAspect);
+    return screenUV / half + 0.5;
+}
+
+// Samples the user image at 0..1 UV, returning transparent black outside
+// [0,1] (the image's own edge) or before anything has been loaded, so
+// callers can composite against a background without a branch of their
+// own. Flips V: JUCE decodes images top-row-first, uploaded as-is, while
+// GL texture V=0 is conventionally the bottom.
+vec4 sampleUserImage(vec2 uv01)
+{
+    if (uUserImageLoaded < 0.5 || uv01.x < 0.0 || uv01.x > 1.0 || uv01.y < 0.0 || uv01.y > 1.0)
+        return vec4(0.0);
+    return texture(uUserImage, vec2(uv01.x, 1.0 - uv01.y));
+}
+
+// What every image preset shows before an image is actually loaded: a
+// gentle pulsing palette glow with an implicit "drop an image in" read,
+// so the preset never looks broken/black while idle.
+vec3 imagePlaceholder(vec2 uv)
+{
+    float r = length(uv);
+    float pulse = 0.5 + 0.5 * sin(uTime * 1.4);
+    float ring = smoothstep(0.02, 0.0, abs(r - (0.28 + 0.03 * pulse)));
+    vec3 col = palette(r * 0.6 + uTime * 0.02, uHue) * (0.10 + ring * 0.9);
+    return col;
 }
 
 // Shared body for the plain "explorer" presets: the fractal rendered

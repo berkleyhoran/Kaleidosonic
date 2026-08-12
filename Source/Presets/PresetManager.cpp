@@ -29,6 +29,9 @@ namespace
         { BinaryData::tricorn_frag,            BinaryData::tricorn_fragSize },
         { BinaryData::burning_ship_3d_frag,    BinaryData::burning_ship_3d_fragSize },
         { BinaryData::audio_nebula_frag,       BinaryData::audio_nebula_fragSize },
+        { BinaryData::image_ripple_frag,       BinaryData::image_ripple_fragSize },
+        { BinaryData::image_shatter_frag,      BinaryData::image_shatter_fragSize },
+        { BinaryData::image_kaleidoscope_frag, BinaryData::image_kaleidoscope_fragSize },
     };
 
     constexpr int numPresets = (int) (sizeof(presetResources) / sizeof(Resource));

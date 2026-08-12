@@ -1,10 +1,36 @@
 #include "PluginEditor.h"
 
+void KaleidosonicAudioProcessorEditor::GroupHeader::paint(juce::Graphics& g)
+{
+    auto bounds = getLocalBounds();
+    g.setColour(juce::Colour(0xff1e1526));
+    g.fillRect(bounds);
+    g.setColour(juce::Colour(0xff382a44));
+    g.fillRect(bounds.removeFromBottom(1));
+
+    g.setColour(juce::Colours::white.withAlpha(0.85f));
+    g.setFont(juce::Font(juce::FontOptions(14.0f, juce::Font::bold)));
+    auto textBounds = getLocalBounds().reduced(8, 0);
+    g.drawText((expanded ? juce::String(juce::CharPointer_UTF8("\xe2\x96\xbe ")) // ▾
+                          : juce::String(juce::CharPointer_UTF8("\xe2\x96\xb8 "))) // ▸
+                   + title,
+               textBounds, juce::Justification::centredLeft);
+}
+
+void KaleidosonicAudioProcessorEditor::GroupHeader::mouseUp(const juce::MouseEvent&)
+{
+    expanded = ! expanded;
+    repaint();
+    if (onToggle != nullptr)
+        onToggle();
+}
+
 KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicAudioProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p), renderer(p.analyzer, p.paramRefs)
 {
     presetLabel.setText("Preset", juce::dontSendNotification);
     presetLabel.setJustificationType(juce::Justification::left);
+    presetLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     controlsContent.addAndMakeVisible(presetLabel);
 
     presetBox.addItemList(PresetNames::all, 1);
@@ -12,40 +38,47 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     presetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.apvts, ParamIDs::presetIndex, presetBox);
 
-    addParamSlider(ParamIDs::presetMorph, "Morph To Next");
-    addParamSlider(ParamIDs::reactivity, "Reactivity");
-    addParamSlider(ParamIDs::bassGain, "Bass Gain");
-    addParamSlider(ParamIDs::midGain, "Mid Gain");
-    addParamSlider(ParamIDs::trebleGain, "Treble Gain");
-    addParamSlider(ParamIDs::zoomSpeed, "Zoom Speed");
-    addParamSlider(ParamIDs::rotationSpeed, "Rotation Speed");
-    addParamSlider(ParamIDs::hue, "Hue");
-    addParamSlider(ParamIDs::saturation, "Saturation");
-    addParamSlider(ParamIDs::brightness, "Brightness");
-    addParamSlider(ParamIDs::contrast, "Contrast");
-    addParamSlider(ParamIDs::kaleidoscopeSegments, "Kaleidoscope Segments");
-    addParamSlider(ParamIDs::feedbackAmount, "Feedback");
-    addParamSlider(ParamIDs::iterations, "Iterations");
-    addParamSlider(ParamIDs::distortion, "Distortion");
-    addParamSlider(ParamIDs::zoomWander, "Zoom Wander");
-    addParamSlider(ParamIDs::cameraShake, "Camera Shake");
-    addParamSlider(ParamIDs::cameraScale, "Camera Scale");
-    addParamSlider(ParamIDs::palette, "Palette");
-    addParamSlider(ParamIDs::trails, "Trails");
-    addParamSlider(ParamIDs::blur, "Blur");
-    addParamSlider(ParamIDs::noiseAmount, "Noise");
-    addParamSlider(ParamIDs::datamosh, "Datamosh");
-    addParamSlider(ParamIDs::bloomIntensity, "Bloom Intensity");
-    addParamSlider(ParamIDs::vignette, "Vignette");
-    addParamSlider(ParamIDs::chromaticAberration, "Chromatic Aberration");
-    addParamSlider(ParamIDs::colorCycleSpeed, "Color Cycle Speed");
-    addParamSlider(ParamIDs::pulseDepth, "Pulse Depth");
-    addParamSlider(ParamIDs::posterize, "Posterize");
-    addParamSlider(ParamIDs::fisheye, "Fisheye");
-    addParamSlider(ParamIDs::trailDirection, "Trail Direction");
-    addParamSlider(ParamIDs::flame, "Flame");
-    addParamSlider(ParamIDs::shine, "Shine");
-    addParamSlider(ParamIDs::gummy, "Gummy");
+    presetMorphSlider.reset(addParamSlider(controlsContent, ParamIDs::presetMorph, "Morph To Next"));
+
+    loadImageButton.onClick = [this] { openImageChooser(); };
+    controlsContent.addAndMakeVisible(loadImageButton);
+    imageStatusLabel.setJustificationType(juce::Justification::left);
+    imageStatusLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.7f));
+    imageStatusLabel.setFont(juce::Font(juce::FontOptions(12.0f)));
+    imageStatusLabel.setText("No image loaded", juce::dontSendNotification);
+    controlsContent.addAndMakeVisible(imageStatusLabel);
+
+    // Reconnect a picture chosen in an earlier session (the path survives
+    // in the plugin's saved state -- see PluginProcessor::getImagePath).
+    // setSourceImage() is safe to call before the GL context exists; the
+    // upload is deferred to the first frame either way.
+    if (const auto savedPath = processorRef.getImagePath(); savedPath.isNotEmpty())
+    {
+        if (juce::File file(savedPath); file.existsAsFile())
+            loadImageFromFile(file);
+    }
+
+    for (const auto& groupInfo : paramGroups())
+    {
+        auto* groupUI = new ParamGroupUI();
+        groupUI->header.title = groupInfo.title;
+        groupUI->header.onToggle = [this] { resized(); };
+        controlsContent.addAndMakeVisible(groupUI->header);
+
+        for (const auto& paramID : groupInfo.paramIDs)
+        {
+            // Display name: look up the human-readable name JUCE already
+            // has from the parameter itself, rather than a second
+            // hand-maintained ID->name table that could drift out of sync.
+            juce::String displayName = paramID;
+            if (auto* param = processorRef.apvts.getParameter(paramID))
+                displayName = param->getName(64);
+
+            groupUI->sliders.add(addParamSlider(controlsContent, paramID, displayName));
+        }
+
+        paramGroupUIs.add(groupUI);
+    }
 
     controlsViewport.setViewedComponent(&controlsContent, false);
     controlsViewport.setScrollBarsShown(true, false);
@@ -69,32 +102,104 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     setWantsKeyboardFocus(true);
 
     renderer.attachTo(*this);
+
+    updateParamRelevance();
+    startTimerHz(6);
 }
 
 KaleidosonicAudioProcessorEditor::~KaleidosonicAudioProcessorEditor()
 {
+    stopTimer();
     renderer.detach();
 }
 
-void KaleidosonicAudioProcessorEditor::addParamSlider(const juce::String& paramID, const juce::String& displayName)
+KaleidosonicAudioProcessorEditor::ParamSlider* KaleidosonicAudioProcessorEditor::addParamSlider(
+    juce::Component& parent, const juce::String& paramID, const juce::String& displayName)
 {
     auto* ps = new ParamSlider();
+    ps->paramID = paramID;
     ps->label.setText(displayName, juce::dontSendNotification);
     ps->label.setJustificationType(juce::Justification::left);
     ps->label.setColour(juce::Label::textColourId, juce::Colours::white);
-    controlsContent.addAndMakeVisible(ps->label);
+    parent.addAndMakeVisible(ps->label);
 
     ps->slider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     // Sliders must not swallow the mouse wheel: the wheel scrolls the panel
     // (or zooms an explorer preset), and accidentally yanking parameter
     // values while scrolling was a genuine usability bug.
     ps->slider.setScrollWheelEnabled(false);
-    controlsContent.addAndMakeVisible(ps->slider);
+    parent.addAndMakeVisible(ps->slider);
 
     ps->attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, paramID, ps->slider);
 
-    paramSliders.add(ps);
+    return ps;
+}
+
+void KaleidosonicAudioProcessorEditor::openImageChooser()
+{
+    imageFileChooser = std::make_unique<juce::FileChooser>(
+        "Choose an image for the image-reactive presets", juce::File(), "*.png;*.jpg;*.jpeg;*.bmp;*.gif");
+
+    // launchAsync, not the old blocking show(): a modal file dialog on the
+    // message thread is deprecated in modern JUCE and disallowed outright
+    // in some sandboxed hosts. The chooser stays alive on `this` until the
+    // callback fires.
+    imageFileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                   [this](const juce::FileChooser& fc)
+                                   {
+                                       const auto file = fc.getResult();
+                                       if (file.existsAsFile())
+                                           loadImageFromFile(file);
+                                   });
+}
+
+void KaleidosonicAudioProcessorEditor::loadImageFromFile(const juce::File& file)
+{
+    const auto image = juce::ImageFileFormat::loadFrom(file);
+    if (! image.isValid())
+    {
+        imageStatusLabel.setText("Couldn't read \"" + file.getFileName() + "\"", juce::dontSendNotification);
+        return;
+    }
+
+    renderer.setSourceImage(image);
+    processorRef.setImagePath(file.getFullPathName());
+    imageStatusLabel.setText(file.getFileName(), juce::dontSendNotification);
+}
+
+void KaleidosonicAudioProcessorEditor::timerCallback()
+{
+    const int current = processorRef.paramRefs.presetIndex != nullptr
+                             ? juce::roundToInt(processorRef.paramRefs.presetIndex->load())
+                             : 0;
+    if (current != lastKnownPresetIndex)
+        updateParamRelevance();
+}
+
+void KaleidosonicAudioProcessorEditor::updateParamRelevance()
+{
+    lastKnownPresetIndex = processorRef.paramRefs.presetIndex != nullptr
+                                ? juce::roundToInt(processorRef.paramRefs.presetIndex->load())
+                                : 0;
+
+    constexpr float dimAlpha = 0.38f;
+    for (auto* groupUI : paramGroupUIs)
+    {
+        for (auto* ps : groupUI->sliders)
+        {
+            const bool relevant = isParamRelevantForPreset(lastKnownPresetIndex, ps->paramID);
+            ps->label.setAlpha(relevant ? 1.0f : dimAlpha);
+            ps->slider.setAlpha(relevant ? 1.0f : dimAlpha);
+            // Dimmed but not functionally locked out: the parameter is
+            // still real and still automatable from the DAW regardless
+            // (host automation doesn't go through this UI at all), so
+            // disabling local mouse interaction would only stop a user
+            // from pre-setting a value ahead of switching to a preset
+            // where it matters -- not worth the confusion of a truly dead
+            // control.
+        }
+    }
 }
 
 void KaleidosonicAudioProcessorEditor::paint(juce::Graphics&)
@@ -204,24 +309,64 @@ void KaleidosonicAudioProcessorEditor::resized()
     if (! controlsViewport.isVisible())
         return;
 
-    const int panelWidth = juce::jmin(300, getWidth() / 2);
+    const int panelWidth = juce::jmin(320, getWidth() / 2);
     auto panelBounds = getLocalBounds().removeFromRight(panelWidth);
     controlsViewport.setBounds(panelBounds);
 
-    const int rowHeight = 46;
-    const int numRows = 1 + paramSliders.size(); // preset combo + sliders
-    controlsContent.setSize(panelBounds.getWidth() - controlsViewport.getScrollBarThickness(),
-                             rowHeight * numRows + 16);
+    constexpr int rowHeight = 44;
+    constexpr int headerHeight = 26;
+    constexpr int presetRowHeight = 46;
+    constexpr int imageRowHeight = 46;
 
-    auto content = controlsContent.getLocalBounds().reduced(8);
-    auto presetRow = content.removeFromTop(rowHeight);
+    // First pass: total content height, so the Viewport's scrollbar is
+    // sized correctly before we position anything.
+    // margin + preset combo + always-visible Morph + Load Image row
+    int totalHeight = 16 + presetRowHeight + rowHeight + imageRowHeight;
+    for (auto* groupUI : paramGroupUIs)
+        totalHeight += headerHeight + (groupUI->header.expanded ? rowHeight * groupUI->sliders.size() : 0);
+
+    controlsContent.setSize(panelBounds.getWidth() - controlsViewport.getScrollBarThickness(), totalHeight);
+
+    auto content = controlsContent.getLocalBounds().reduced(8, 8);
+    auto presetRow = content.removeFromTop(presetRowHeight);
     presetLabel.setBounds(presetRow.removeFromTop(18));
     presetBox.setBounds(presetRow);
 
-    for (auto* ps : paramSliders)
+    auto morphRow = content.removeFromTop(rowHeight);
+    presetMorphSlider->label.setBounds(morphRow.removeFromTop(18));
+    presetMorphSlider->slider.setBounds(morphRow);
+
+    auto imageRow = content.removeFromTop(imageRowHeight);
+    loadImageButton.setBounds(imageRow.removeFromTop(24));
+    imageStatusLabel.setBounds(imageRow);
+
+    // Full-bleed section headers read as dividers cutting edge-to-edge
+    // across the panel, so they're positioned in the un-reduced content
+    // width rather than the 8px-inset column the sliders sit in.
+    const int fullWidth = controlsContent.getLocalBounds().getWidth();
+
+    for (auto* groupUI : paramGroupUIs)
     {
-        auto row = content.removeFromTop(rowHeight);
-        ps->label.setBounds(row.removeFromTop(18));
-        ps->slider.setBounds(row);
+        auto headerRow = content.removeFromTop(headerHeight);
+        groupUI->header.setBounds(0, headerRow.getY(), fullWidth, headerHeight);
+
+        if (! groupUI->header.expanded)
+        {
+            for (auto* ps : groupUI->sliders)
+            {
+                ps->label.setVisible(false);
+                ps->slider.setVisible(false);
+            }
+            continue;
+        }
+
+        for (auto* ps : groupUI->sliders)
+        {
+            ps->label.setVisible(true);
+            ps->slider.setVisible(true);
+            auto row = content.removeFromTop(rowHeight);
+            ps->label.setBounds(row.removeFromTop(18));
+            ps->slider.setBounds(row);
+        }
     }
 }

@@ -11,7 +11,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **21 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **22 GLSL presets**, switchable and cross-fadable while the DAW automates
   them:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
@@ -56,16 +56,29 @@ Audio passes through completely unmodified — this is a pure visualizer.
     **Raymarch Tunnel 3D**, **Particle Bloom**, **Oscilloscope Glow**,
     **Waveform Scope**, **Fractal Bubbles**, **Starfield Warp** — feedback,
     tunnel, particle, and scope-style presets.
+  - **Audio Nebula** — domain-warped FBM noise clouds (the "iq warping"
+    technique: the noise field warps its own sampling coordinates, twice),
+    which turns flat noise into real billowing smoke. Bass drives the warp
+    amplitude so the clouds physically churn on the low end, treble adds a
+    fine shimmer octave, and onsets flash lightning through the cloud body
+    along ridged-noise filaments.
 - **Real-time audio analysis** (FFT-based): bass/mid/treble band energy,
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
   rolling waveform buffer, and **auto-gain** normalization so reactivity
   tracks the *dynamics* of whatever's playing instead of absolute loudness.
-- **31 automatable parameters**, including a **Palette** parameter (0–8)
+- **35 automatable parameters**, including a **Palette** parameter (0–8)
   that sweeps/crossfades through curated cosine-gradient palettes
   (Spectrum, Fire, Ice, Synthwave, Sunset, Forest, Mono, Psychedelic) on
-  top of the Hue knob, plus eleven global post-FX (Trails, Blur, Noise,
+  top of the Hue knob, plus fifteen global post-FX (Trails, Blur, Noise,
   Datamosh, Bloom, Vignette, Chromatic Aberration, Color Cycle Speed,
-  Pulse Depth, Posterize, Fisheye).
+  Pulse Depth, Posterize, Fisheye, Trail Direction, Flame, Shine, Gummy).
+  Flame streams bright content along an adjustable direction (0° = up)
+  with turbulence and warm ember decay, so it reads as rising fire (or
+  drips/streaks in any direction you dial in); Shine grows anisotropic
+  star-streak specular glints out of hot spots with a glossy response
+  curve; Gummy adds a soft audio-breathing screen-space wobble plus a
+  milky response lift, so the whole image reads as translucent, lit
+  jelly. All three are 0 by default and layer on top of *any* preset.
 - **Manual control panel** (collapsible, scrollable, opaque backdrop so
   labels stay readable over any visual) with a slider for every parameter.
   Sliders deliberately ignore the mouse wheel so wheel-scrolling the panel
@@ -129,7 +142,7 @@ Shaders/
   apollonian.frag             plasma_feedback.frag     ifs_tunnel.frag
   tunnel_spiral.frag          raymarch_tunnel.frag     particle_bloom.frag
   oscilloscope.frag           waveform_scope.frag      fractal_bubbles.frag
-  starfield_warp.frag
+  starfield_warp.frag         audio_nebula.frag
 ```
 
 The renderer pipeline is two stages: the selected preset (or two, cross-
@@ -175,7 +188,7 @@ standalone app at
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (21) | Selects the active shader preset |
+| Preset | choice (22) | Selects the active shader preset |
 | Preset Morph | 0–1 | Cross-fades toward the *next* preset in the list |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
 | Bass / Mid / Treble Gain | 0–2 each | Per-band weighting before it hits the shaders |
@@ -204,6 +217,10 @@ standalone app at
 | Pulse Depth | 0–2 | Scales the automatic audio-tied brightness pulse (0 = off) |
 | Posterize | 0–1 | Quantizes color into hard bands |
 | Fisheye | 0–1 | Central lens-warp radial distortion |
+| Trail Direction | -180–180° | Direction Flame's trails stream (0 = up) |
+| Flame | 0–1 | Bright content streams/licks along Trail Direction with warm ember decay |
+| Shine | 0–1 | Anisotropic star-streak specular on hot spots + glossy response curve |
+| Gummy | 0–1 | Soft audio-breathing screen-space jelly wobble + milky response lift |
 
 ## Adding a new preset
 

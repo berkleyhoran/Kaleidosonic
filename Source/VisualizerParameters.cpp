@@ -52,6 +52,10 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::pulseDepth, "Pulse Depth", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::posterize, "Posterize", 0.0f, 1.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::fisheye, "Fisheye", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::trailDirection, "Trail Direction", -180.0f, 180.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::flame, "Flame", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::shine, "Shine", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::gummy, "Gummy", 0.0f, 1.0f, 0.0f));
 
     return { params.begin(), params.end() };
 }
@@ -90,4 +94,8 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     pulseDepth              = apvts.getRawParameterValue(ParamIDs::pulseDepth);
     posterize               = apvts.getRawParameterValue(ParamIDs::posterize);
     fisheye                 = apvts.getRawParameterValue(ParamIDs::fisheye);
+    trailDirection          = apvts.getRawParameterValue(ParamIDs::trailDirection);
+    flame                   = apvts.getRawParameterValue(ParamIDs::flame);
+    shine                   = apvts.getRawParameterValue(ParamIDs::shine);
+    gummy                   = apvts.getRawParameterValue(ParamIDs::gummy);
 }

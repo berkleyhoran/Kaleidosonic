@@ -28,6 +28,7 @@ namespace
         { BinaryData::buffalo_frag,            BinaryData::buffalo_fragSize },
         { BinaryData::tricorn_frag,            BinaryData::tricorn_fragSize },
         { BinaryData::burning_ship_3d_frag,    BinaryData::burning_ship_3d_fragSize },
+        { BinaryData::audio_nebula_frag,       BinaryData::audio_nebula_fragSize },
     };
 
     constexpr int numPresets = (int) (sizeof(presetResources) / sizeof(Resource));

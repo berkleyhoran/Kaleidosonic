@@ -40,6 +40,10 @@ namespace ParamIDs
     static const juce::String pulseDepth             { "pulseDepth" };
     static const juce::String posterize              { "posterize" };
     static const juce::String fisheye                { "fisheye" };
+    static const juce::String trailDirection         { "trailDirection" };
+    static const juce::String flame                  { "flame" };
+    static const juce::String shine                  { "shine" };
+    static const juce::String gummy                  { "gummy" };
 }
 
 // Names of the built-in presets, in the order they are compiled/selected.
@@ -68,7 +72,8 @@ namespace PresetNames
         "Perpendicular Ship",
         "Buffalo Fractal",
         "Tricorn",
-        "Burning Ship 3D"
+        "Burning Ship 3D",
+        "Audio Nebula"
     };
 }
 
@@ -110,6 +115,10 @@ struct VisualizerParameterRefs
     std::atomic<float>* pulseDepth         = nullptr;
     std::atomic<float>* posterize          = nullptr;
     std::atomic<float>* fisheye            = nullptr;
+    std::atomic<float>* trailDirection     = nullptr;
+    std::atomic<float>* flame              = nullptr;
+    std::atomic<float>* shine              = nullptr;
+    std::atomic<float>* gummy              = nullptr;
 
     void resolve(juce::AudioProcessorValueTreeState& apvts);
 };

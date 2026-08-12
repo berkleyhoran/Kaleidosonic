@@ -50,10 +50,23 @@ namespace
         uniform float uPulseDepth;
         uniform float uPosterize;
         uniform float uFisheye;
+        uniform float uTrailDirection; // degrees; 0 = screen up
+        uniform float uFlame;
+        uniform float uShine;
+        uniform float uGummy;
 
         float hash(vec2 p)
         {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+
+        // Bright-pass tap for the Shine streaks: only genuinely hot pixels
+        // contribute, so streaks grow out of highlights, not the whole frame.
+        vec3 brightTap(sampler2D tex, vec2 p)
+        {
+            vec3 s = texture(tex, clamp(p, 0.0, 1.0)).rgb;
+            float lum = dot(s, vec3(0.299, 0.587, 0.114));
+            return s * smoothstep(0.55, 0.95, lum);
         }
 
         vec3 rgb2hsv(vec3 c)
@@ -89,9 +102,34 @@ namespace
                 uv = clamp(vec2(cos(theta), sin(theta)) * warped + 0.5, 0.0, 1.0);
             }
 
+            // Gummy: soft jelly refraction -- a slow, audio-breathing
+            // screen-space wobble applied to the sampling coordinate itself,
+            // so the whole picture squishes like lit gelatin.
+            if (uGummy > 0.001)
+            {
+                float wob = uGummy * (0.006 + 0.004 * uLevel + 0.003 * uOnset);
+                uv += vec2(sin(uv.y * 21.0 + uTime * 1.7), cos(uv.x * 19.0 - uTime * 1.3)) * wob;
+                uv = clamp(uv, 0.0, 1.0);
+            }
+
             vec2 rawUv = uv;
             vec2 historyUv = uv;
             float rgbSplit = 0.0;
+
+            // Directional flame trails: sample last frame's output displaced
+            // opposite the travel direction (0 deg = up), with sideways
+            // turbulence, so bright content streams/licks along it frame
+            // over frame like rising fire. The blend happens below, after
+            // history is sampled.
+            vec2 flameDir = vec2(sin(radians(uTrailDirection)), cos(radians(uTrailDirection)));
+            if (uFlame > 0.001)
+            {
+                vec2 flamePerp = vec2(flameDir.y, -flameDir.x);
+                float turb = (hash(vec2(dot(uv, flamePerp) * 43.0, floor(uTime * 24.0))) - 0.5) * 0.008
+                           + sin(dot(uv, flamePerp) * 37.0 + uTime * 5.0) * 0.002;
+                historyUv -= flameDir * (0.002 + 0.005 * uFlame + 0.004 * uOnset);
+                historyUv += flamePerp * turb * uFlame;
+            }
 
             // Datamosh: real P-frame-style corruption, not just jittered
             // squares. Blocks displace along a per-block "motion vector"
@@ -118,7 +156,7 @@ namespace
                 float strength = (uDatamosh * 0.16 + burst * 0.35) * dirBias;
                 vec2 offset = dir * strength;
 
-                historyUv = clamp(uv + offset, 0.0, 1.0);
+                historyUv = clamp(historyUv + offset, 0.0, 1.0); // additive, so Flame's displacement survives
 
                 float freezeChance = 0.3 + 0.5 * uDatamosh + burst * 0.35;
                 float freeze = step(1.0 - freezeChance, hash(block * 1.37 + epoch * 0.7));
@@ -179,12 +217,48 @@ namespace
             float bloomAmount = (0.4 + uLevel * 0.7 + uOnset * 1.1) * uBloomIntensity;
             raw += bloom * bloomAmount;
 
+            // Shine: anisotropic star-streak specular -- bright-pass taps
+            // marched along two crossed diagonals, weighted down with
+            // distance, so hot spots grow gleaming star arms. Onsets flare
+            // the streaks.
+            if (uShine > 0.001)
+            {
+                vec2 texel = 1.0 / max(uResolution, vec2(1.0));
+                vec2 arm1 = vec2(1.0, 0.35) * texel * 4.0;
+                vec2 arm2 = vec2(-0.35, 1.0) * texel * 4.0;
+                vec3 streak = vec3(0.0);
+                for (int s = 1; s <= 5; ++s)
+                {
+                    float wgt = 1.0 / (float(s) * 1.5);
+                    streak += (brightTap(uRaw, rawUv + arm1 * float(s)) + brightTap(uRaw, rawUv - arm1 * float(s))
+                             + brightTap(uRaw, rawUv + arm2 * float(s)) + brightTap(uRaw, rawUv - arm2 * float(s))) * wgt;
+                }
+                raw += streak * uShine * (0.35 + uOnset * 0.5);
+                // Glossy pop: gentle s-curve so highlights read wet/polished.
+                raw = mix(raw, smoothstep(vec3(0.0), vec3(1.0), raw) * 1.05, uShine * 0.4);
+            }
+
             vec3 history = texture(uHistory, clamp(historyUv, vec2(0.002), vec2(0.998))).rgb;
 
             // Trails: exponential moving average against last frame's fully
             // processed output -- a bounded, standard phosphor-persistence
             // blend, so it can't blow out or decay to black on its own.
             vec3 col = mix(raw, history, clamp(uTrails, 0.0, 0.97));
+
+            // Flame blend: bright history content decays warm (embers cool
+            // toward red) while streaming along the trail direction; max()
+            // keeps flames licking over dark areas without dimming the
+            // live image underneath.
+            if (uFlame > 0.001)
+            {
+                vec3 ember = history * vec3(0.97, 0.86, 0.70);
+                col = max(col, ember * (0.5 + 0.46 * uFlame));
+            }
+
+            // Gummy's milky lift: soften the response curve so everything
+            // reads translucent and soft-bodied.
+            if (uGummy > 0.001)
+                col = mix(col, pow(max(col, 0.0), vec3(0.78)) * 0.92 + 0.015, uGummy * 0.4);
 
             if (uNoiseAmount > 0.001)
             {
@@ -337,6 +411,10 @@ VisualizerRenderer::PostUniforms::PostUniforms(juce::OpenGLShaderProgram& progra
     pulseDepth = makeUniformIfPresent(program, "uPulseDepth");
     posterize = makeUniformIfPresent(program, "uPosterize");
     fisheye = makeUniformIfPresent(program, "uFisheye");
+    trailDirection = makeUniformIfPresent(program, "uTrailDirection");
+    flame = makeUniformIfPresent(program, "uFlame");
+    shine = makeUniformIfPresent(program, "uShine");
+    gummy = makeUniformIfPresent(program, "uGummy");
 }
 
 VisualizerRenderer::VisualizerRenderer(AudioAnalyzer& analyzerToUse, VisualizerParameterRefs& paramsToUse)
@@ -835,6 +913,10 @@ void VisualizerRenderer::renderOpenGL()
         setU(postUniforms->pulseDepth, params.pulseDepth != nullptr ? params.pulseDepth->load() : 1.0f);
         setU(postUniforms->posterize, params.posterize != nullptr ? params.posterize->load() : 0.0f);
         setU(postUniforms->fisheye, params.fisheye != nullptr ? params.fisheye->load() : 0.0f);
+        setU(postUniforms->trailDirection, params.trailDirection != nullptr ? params.trailDirection->load() : 0.0f);
+        setU(postUniforms->flame, params.flame != nullptr ? params.flame->load() : 0.0f);
+        setU(postUniforms->shine, params.shine != nullptr ? params.shine->load() : 0.0f);
+        setU(postUniforms->gummy, params.gummy != nullptr ? params.gummy->load() : 0.0f);
 
         glDrawArrays(GL_TRIANGLES, 0, 3);
     }

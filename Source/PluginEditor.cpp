@@ -42,6 +42,10 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     addParamSlider(ParamIDs::pulseDepth, "Pulse Depth");
     addParamSlider(ParamIDs::posterize, "Posterize");
     addParamSlider(ParamIDs::fisheye, "Fisheye");
+    addParamSlider(ParamIDs::trailDirection, "Trail Direction");
+    addParamSlider(ParamIDs::flame, "Flame");
+    addParamSlider(ParamIDs::shine, "Shine");
+    addParamSlider(ParamIDs::gummy, "Gummy");
 
     controlsViewport.setViewedComponent(&controlsContent, false);
     controlsViewport.setScrollBarsShown(true, false);

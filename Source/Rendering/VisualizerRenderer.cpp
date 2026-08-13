@@ -74,6 +74,8 @@ namespace
         uniform float uFlame;
         uniform float uShine;
         uniform float uGummy;
+        uniform float uJpegify;
+        uniform float uDotMatrix;
         uniform float uColorOverride;
         uniform vec3 uPrimaryColor;
         uniform vec3 uSecondaryColor;
@@ -222,6 +224,42 @@ namespace
                 raw = mix(raw, sum / 9.0, clamp(uBlur, 0.0, 1.0));
             }
 
+            // Jpegify: cheap-but-convincing fake JPEG artifacts -- not a
+            // literal per-block DCT (way too expensive per-pixel for no
+            // visual gain here), just the three things an eye actually
+            // reads as "that's a jpeg": blocky quantization, chroma
+            // subsampling (color resampled at a coarser grid than
+            // brightness, so saturated color bleeds past sharp edges --
+            // the real 4:2:0 artifact), and a little ringing right at
+            // block boundaries (mosquito noise's actual signature).
+            if (uJpegify > 0.001)
+            {
+                float blockPx = mix(4.0, 20.0, clamp(uJpegify, 0.0, 1.0));
+                vec2 texel = 1.0 / max(uResolution, vec2(1.0));
+                vec2 blockSize = texel * blockPx;
+                vec2 blockUv = (floor(rawUv / blockSize) + 0.5) * blockSize;
+                vec2 chromaBlockUv = (floor(rawUv / (blockSize * 2.0)) + 0.5) * (blockSize * 2.0);
+
+                vec3 blockCol = texture(uRaw, clamp(blockUv, 0.0, 1.0)).rgb;
+                vec3 chromaCol = texture(uRaw, clamp(chromaBlockUv, 0.0, 1.0)).rgb;
+
+                // Keep the blocky luma, borrow color from the coarser
+                // chroma block -- sharp-brightness-with-bled-color is the
+                // single biggest "that's compressed" tell.
+                float blockLum = dot(blockCol, vec3(0.299, 0.587, 0.114));
+                float chromaLum = dot(chromaCol, vec3(0.299, 0.587, 0.114));
+                vec3 jpeg = chromaCol + (blockLum - chromaLum);
+
+                vec2 neighborUv = clamp(blockUv + sign(rawUv - blockUv) * blockSize, 0.0, 1.0);
+                vec3 neighborCol = texture(uRaw, neighborUv).rgb;
+                float edgeStrength = length(blockCol - neighborCol);
+                vec2 withinBlock = (rawUv - (blockUv - blockSize * 0.5)) / blockSize;
+                float ring = sin(withinBlock.x * 25.13) * sin(withinBlock.y * 25.13) * edgeStrength * 0.5;
+                jpeg += ring;
+
+                raw = mix(raw, jpeg, clamp(uJpegify, 0.0, 1.0));
+            }
+    )GLSL" R"GLSL(
             // Always-on soft glow: bright-pass neighbors added back
             // additively so hot edges genuinely bloom, intensity breathing
             // with the audio instead of being a flat constant.
@@ -312,6 +350,34 @@ namespace
             {
                 float levels = mix(64.0, 3.0, clamp(uPosterize, 0.0, 1.0));
                 col = floor(col * levels + 0.5) / levels;
+            }
+
+            // Dot Matrix: an audio-reactive halftone/particle-grid overlay
+            // -- a regular grid of dots sized by the underlying picture's
+            // local brightness (so it reads as "the image, but rendered
+            // as an LED/particle grid") and per-cell twinkling so it
+            // feels alive rather than a static screen filter. Bass/onset
+            // pulse the whole grid's scale -- the "particle" half of the
+            // ask, without needing an actual simulated particle buffer.
+            if (uDotMatrix > 0.001)
+            {
+                float cellPx = mix(26.0, 9.0, clamp(uDotMatrix, 0.0, 1.0));
+                vec2 cellUv = uv * uResolution / cellPx;
+                vec2 cellId = floor(cellUv);
+                vec2 cellFrac = fract(cellUv) - 0.5;
+
+                vec2 sampleUv = clamp((cellId + 0.5) * cellPx / uResolution, 0.0, 1.0);
+                vec3 cellCol = texture(uRaw, sampleUv).rgb;
+                float lum = dot(cellCol, vec3(0.299, 0.587, 0.114));
+
+                float twinkle = 0.55 + 0.45 * sin(uTime * (1.5 + hash(cellId) * 2.2) + hash(cellId) * 40.0);
+                float pulse = 1.0 + uLevel * 0.6 + uOnset * 1.1;
+                float radius = clamp(lum * 0.48 * pulse * twinkle, 0.0, 0.48);
+
+                float dotMask = 1.0 - smoothstep(radius - 0.08, radius, length(cellFrac));
+                vec3 dotted = cellCol * (1.3 + uOnset * 0.7) * dotMask;
+
+                col = mix(col, dotted, uDotMatrix);
             }
 
             // Duotone color override: remap the whole image onto a
@@ -459,6 +525,8 @@ VisualizerRenderer::PostUniforms::PostUniforms(juce::OpenGLShaderProgram& progra
     flame = makeUniformIfPresent(program, "uFlame");
     shine = makeUniformIfPresent(program, "uShine");
     gummy = makeUniformIfPresent(program, "uGummy");
+    jpegify = makeUniformIfPresent(program, "uJpegify");
+    dotMatrix = makeUniformIfPresent(program, "uDotMatrix");
     colorOverride = makeUniformIfPresent(program, "uColorOverride");
     primaryColor = makeUniformIfPresent(program, "uPrimaryColor");
     secondaryColor = makeUniformIfPresent(program, "uSecondaryColor");
@@ -1132,6 +1200,8 @@ void VisualizerRenderer::renderOpenGL()
         setU(postUniforms->flame, params.flame != nullptr ? params.flame->load() : 0.0f);
         setU(postUniforms->shine, params.shine != nullptr ? params.shine->load() : 0.0f);
         setU(postUniforms->gummy, params.gummy != nullptr ? params.gummy->load() : 0.0f);
+        setU(postUniforms->jpegify, params.jpegify != nullptr ? params.jpegify->load() : 0.0f);
+        setU(postUniforms->dotMatrix, params.dotMatrix != nullptr ? params.dotMatrix->load() : 0.0f);
         setU(postUniforms->colorOverride, params.colorOverride != nullptr ? params.colorOverride->load() : 0.0f);
         setU(postUniforms->primaryColor, params.primaryColorR != nullptr ? params.primaryColorR->load() : 1.0f,
              params.primaryColorG != nullptr ? params.primaryColorG->load() : 0.15f,

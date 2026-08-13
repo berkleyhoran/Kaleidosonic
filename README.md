@@ -118,22 +118,27 @@ Audio passes through completely unmodified — this is a pure visualizer.
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
   rolling waveform buffer, and **auto-gain** normalization so reactivity
   tracks the *dynamics* of whatever's playing instead of absolute loudness.
-- **44 automatable parameters**, including a **Palette** parameter (0–8)
+- **46 automatable parameters**, including a **Palette** parameter (0–8)
   that sweeps/crossfades through curated cosine-gradient palettes
   (Spectrum, Fire, Ice, Synthwave, Sunset, Forest, Mono, Psychedelic) on
-  top of the Hue knob, plus sixteen global post-FX (Trails, Blur, Noise,
+  top of the Hue knob, plus eighteen global post-FX (Trails, Blur, Noise,
   Datamosh, Bloom, Vignette, Chromatic Aberration, Color Cycle Speed,
   Pulse Depth, Posterize, Fisheye, Trail Direction, Flame, Shine, Gummy,
-  Color Override). Flame streams bright content along an adjustable
-  direction (0° = up) with turbulence and warm ember decay, so it reads
-  as rising fire (or drips/streaks in any direction you dial in); Shine
-  grows anisotropic star-streak specular glints out of hot spots with a
-  glossy response curve; Gummy adds a soft audio-breathing screen-space
-  wobble plus a milky response lift, so the whole image reads as
-  translucent, lit jelly; Color Override remaps the whole image onto a
-  luminance gradient between two picked colors (a duotone effect) via
-  the Primary/Secondary Color swatches in the panel. All four are 0/off
-  by default and layer on top of *any* preset.
+  Jpegify, Dot Matrix, Color Override). Flame streams bright content
+  along an adjustable direction (0° = up) with turbulence and warm ember
+  decay, so it reads as rising fire (or drips/streaks in any direction
+  you dial in); Shine grows anisotropic star-streak specular glints out
+  of hot spots with a glossy response curve; Gummy adds a soft
+  audio-breathing screen-space wobble plus a milky response lift, so the
+  whole image reads as translucent, lit jelly; Jpegify fakes real JPEG
+  compression damage — blocky quantization, chroma-subsampling color
+  bleed, and edge ringing, not a literal DCT, just the three things that
+  actually read as "that's compressed"; Dot Matrix redraws the image as
+  an audio-reactive halftone/particle grid, each dot sized by local
+  brightness and gently twinkling; Color Override remaps the whole image
+  onto a luminance gradient between two picked colors (a duotone effect)
+  via the Primary/Secondary Color swatches in the panel. All six are
+  0/off by default and layer on top of *any* preset.
 - **Two-layer compositing**: Layer A (the main Preset dropdown) and an
   independently-chosen **Layer B** blend together via **Layer Mix**
   (0 = just Layer A) through a **Blend Mode** — Crossfade, Add, Screen,
@@ -302,6 +307,8 @@ standalone app at
 | Flame | 0–1 | Bright content streams/licks along Trail Direction with warm ember decay |
 | Shine | 0–1 | Anisotropic star-streak specular on hot spots + glossy response curve |
 | Gummy | 0–1 | Soft audio-breathing screen-space jelly wobble + milky response lift |
+| Jpegify | 0–1 | Fake JPEG damage: blocky quantization, chroma-subsampling color bleed, edge ringing |
+| Dot Matrix | 0–1 | Redraws the image as an audio-reactive halftone/particle dot grid |
 | Color Override | 0–1 | Duotone remap toward the Primary/Secondary Color swatches (0 = original colors) |
 
 ## Adding a new preset

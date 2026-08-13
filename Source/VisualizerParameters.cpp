@@ -66,6 +66,8 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::flame, "Flame", 0.0f, 1.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::shine, "Shine", 0.0f, 1.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::gummy, "Gummy", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::jpegify, "Jpegify", 0.0f, 1.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::dotMatrix, "Dot Matrix", 0.0f, 1.0f, 0.0f));
 
     params.push_back(makeFloat(ParamIDs::colorOverride, "Color Override", 0.0f, 1.0f, 0.0f));
     // Not exposed as sliders (see PluginEditor's ColorSwatch) -- a synthwave
@@ -94,7 +96,7 @@ const std::vector<ParamGroupInfo>& paramGroups()
         { "Post FX: Trails & Flame", { ParamIDs::trails, ParamIDs::trailDirection, ParamIDs::flame } },
         { "Post FX: Filters", { ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::shine,
                                  ParamIDs::gummy, ParamIDs::posterize, ParamIDs::fisheye,
-                                 ParamIDs::chromaticAberration } },
+                                 ParamIDs::chromaticAberration, ParamIDs::jpegify, ParamIDs::dotMatrix } },
         { "Post FX: Glow & Cycle", { ParamIDs::bloomIntensity, ParamIDs::vignette, ParamIDs::colorCycleSpeed,
                                       ParamIDs::pulseDepth } },
     };
@@ -214,7 +216,7 @@ bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID)
         ParamIDs::trails, ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::bloomIntensity,
         ParamIDs::vignette, ParamIDs::chromaticAberration, ParamIDs::colorCycleSpeed, ParamIDs::pulseDepth,
         ParamIDs::posterize, ParamIDs::fisheye, ParamIDs::trailDirection, ParamIDs::flame, ParamIDs::shine,
-        ParamIDs::gummy, ParamIDs::colorOverride,
+        ParamIDs::gummy, ParamIDs::colorOverride, ParamIDs::jpegify, ParamIDs::dotMatrix,
     };
     if (std::find(alwaysRelevant.begin(), alwaysRelevant.end(), paramID) != alwaysRelevant.end())
         return true;
@@ -267,6 +269,8 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     flame                   = apvts.getRawParameterValue(ParamIDs::flame);
     shine                   = apvts.getRawParameterValue(ParamIDs::shine);
     gummy                   = apvts.getRawParameterValue(ParamIDs::gummy);
+    jpegify                 = apvts.getRawParameterValue(ParamIDs::jpegify);
+    dotMatrix               = apvts.getRawParameterValue(ParamIDs::dotMatrix);
 
     colorOverride           = apvts.getRawParameterValue(ParamIDs::colorOverride);
     primaryColorR           = apvts.getRawParameterValue(ParamIDs::primaryColorR);

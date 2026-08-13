@@ -55,6 +55,10 @@ namespace ParamIDs
     static const juce::String flame                  { "flame" };
     static const juce::String shine                  { "shine" };
     static const juce::String gummy                  { "gummy" };
+    // Jpegify: fake-JPEG blockiness/chroma-subsampling/ringing.
+    static const juce::String jpegify                { "jpegify" };
+    // Dot Matrix: audio-reactive halftone/particle-grid overlay.
+    static const juce::String dotMatrix              { "dotMatrix" };
 
     // Duotone color override, default off (colorOverride = 0 -> no visible
     // change at all, so the picked colors are irrelevant until it's turned
@@ -180,6 +184,8 @@ struct VisualizerParameterRefs
     std::atomic<float>* flame              = nullptr;
     std::atomic<float>* shine              = nullptr;
     std::atomic<float>* gummy              = nullptr;
+    std::atomic<float>* jpegify            = nullptr;
+    std::atomic<float>* dotMatrix          = nullptr;
 
     std::atomic<float>* colorOverride      = nullptr;
     std::atomic<float>* primaryColorR      = nullptr;

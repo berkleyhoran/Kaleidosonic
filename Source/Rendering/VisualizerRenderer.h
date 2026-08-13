@@ -83,7 +83,7 @@ private:
     struct BlendUniforms
     {
         explicit BlendUniforms(juce::OpenGLShaderProgram& program);
-        std::unique_ptr<juce::OpenGLShaderProgram::Uniform> texA, texB, mixAmount;
+        std::unique_ptr<juce::OpenGLShaderProgram::Uniform> texA, texB, mixAmount, blendMode;
     };
 
     struct PostUniforms
@@ -91,7 +91,7 @@ private:
         explicit PostUniforms(juce::OpenGLShaderProgram& program);
         std::unique_ptr<juce::OpenGLShaderProgram::Uniform> raw, history, resolution, time, onset, level, trails,
             blur, noiseAmount, datamosh, bloomIntensity, vignette, chromaticAberration, colorCycleSpeed, pulseDepth,
-            posterize, fisheye, trailDirection, flame, shine, gummy;
+            posterize, fisheye, trailDirection, flame, shine, gummy, colorOverride, primaryColor, secondaryColor;
     };
 
     // One escape-time fractal navigator + its GPU reference-orbit texture,

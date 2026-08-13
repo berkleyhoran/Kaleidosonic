@@ -7,7 +7,18 @@
 namespace ParamIDs
 {
     static const juce::String presetIndex          { "presetIndex" };
-    static const juce::String presetMorph           { "presetMorph" };
+    // Layer A is presetIndex above. Layer B is its own independent preset
+    // choice (used to be forced to "whatever's next in the list" -- see
+    // layerMix's comment below for why that changed), blended over Layer A
+    // by layerMix using blendMode.
+    static const juce::String layerBIndex           { "layerBIndex" };
+    static const juce::String blendMode             { "blendMode" };
+    // Was "presetMorph": always blended toward the next preset in the list,
+    // which read as arbitrary/unintuitive and only ever crossfaded. Now the
+    // mix amount between the two independently-chosen layers above, and
+    // blendMode picks *how* they combine (crossfade/add/screen/etc), not
+    // just whether.
+    static const juce::String layerMix              { "layerMix" };
     static const juce::String reactivity             { "reactivity" };
     static const juce::String bassGain               { "bassGain" };
     static const juce::String midGain                { "midGain" };
@@ -44,6 +55,28 @@ namespace ParamIDs
     static const juce::String flame                  { "flame" };
     static const juce::String shine                  { "shine" };
     static const juce::String gummy                  { "gummy" };
+
+    // Duotone color override, default off (colorOverride = 0 -> no visible
+    // change at all, so the picked colors are irrelevant until it's turned
+    // up). The R/G/B triples aren't exposed as sliders -- the editor drives
+    // them from a single color-swatch click (see PluginEditor's ColorSwatch)
+    // -- but they're still real APVTS params so they're saved and, in
+    // principle, automatable.
+    static const juce::String colorOverride          { "colorOverride" };
+    static const juce::String primaryColorR          { "primaryColorR" };
+    static const juce::String primaryColorG          { "primaryColorG" };
+    static const juce::String primaryColorB          { "primaryColorB" };
+    static const juce::String secondaryColorR        { "secondaryColorR" };
+    static const juce::String secondaryColorG        { "secondaryColorG" };
+    static const juce::String secondaryColorB        { "secondaryColorB" };
+}
+
+// Names of the blend modes Layer B can be combined with Layer A through,
+// in the order they're compiled/selected -- index must match the uBlendMode
+// branch in VisualizerRenderer's blend shader.
+namespace BlendModeNames
+{
+    static const juce::StringArray all { "Crossfade", "Add", "Screen", "Multiply", "Difference", "Lighten" };
 }
 
 // Names of the built-in presets, in the order they are compiled/selected.
@@ -110,7 +143,9 @@ bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID);
 struct VisualizerParameterRefs
 {
     std::atomic<float>* presetIndex        = nullptr;
-    std::atomic<float>* presetMorph        = nullptr;
+    std::atomic<float>* layerBIndex        = nullptr;
+    std::atomic<float>* blendMode          = nullptr;
+    std::atomic<float>* layerMix           = nullptr;
     std::atomic<float>* reactivity         = nullptr;
     std::atomic<float>* bassGain           = nullptr;
     std::atomic<float>* midGain            = nullptr;
@@ -145,6 +180,14 @@ struct VisualizerParameterRefs
     std::atomic<float>* flame              = nullptr;
     std::atomic<float>* shine              = nullptr;
     std::atomic<float>* gummy              = nullptr;
+
+    std::atomic<float>* colorOverride      = nullptr;
+    std::atomic<float>* primaryColorR      = nullptr;
+    std::atomic<float>* primaryColorG      = nullptr;
+    std::atomic<float>* primaryColorB      = nullptr;
+    std::atomic<float>* secondaryColorR    = nullptr;
+    std::atomic<float>* secondaryColorG    = nullptr;
+    std::atomic<float>* secondaryColorB    = nullptr;
 
     void resolve(juce::AudioProcessorValueTreeState& apvts);
 };

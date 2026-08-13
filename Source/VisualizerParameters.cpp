@@ -22,7 +22,16 @@ Layout createParameterLayout()
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID(ParamIDs::presetIndex, 1), "Preset", PresetNames::all, 0));
 
-    params.push_back(makeFloat(ParamIDs::presetMorph, "Preset Morph", 0.0f, 1.0f, 0.0f));
+    // Layer B defaults to the second preset in the list (index 1, if there
+    // is one) purely so it's never identical to Layer A's default -- it
+    // doesn't matter in practice since Layer Mix defaults to 0 (Layer A
+    // only) until the user actually turns layering on.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID(ParamIDs::layerBIndex, 1), "Layer B", PresetNames::all,
+        juce::jmin(1, PresetNames::all.size() - 1)));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID(ParamIDs::blendMode, 1), "Blend Mode", BlendModeNames::all, 0));
+    params.push_back(makeFloat(ParamIDs::layerMix, "Layer Mix", 0.0f, 1.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::reactivity, "Reactivity", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::bassGain, "Bass Gain", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::midGain, "Mid Gain", 0.0f, 2.0f, 1.0f));
@@ -58,6 +67,17 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::shine, "Shine", 0.0f, 1.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::gummy, "Gummy", 0.0f, 1.0f, 0.0f));
 
+    params.push_back(makeFloat(ParamIDs::colorOverride, "Color Override", 0.0f, 1.0f, 0.0f));
+    // Not exposed as sliders (see PluginEditor's ColorSwatch) -- a synthwave
+    // pink/blue default so the duotone looks intentional the moment someone
+    // turns Color Override up without having picked colors first.
+    params.push_back(makeFloat(ParamIDs::primaryColorR, "Primary Color R", 0.0f, 1.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::primaryColorG, "Primary Color G", 0.0f, 1.0f, 0.15f));
+    params.push_back(makeFloat(ParamIDs::primaryColorB, "Primary Color B", 0.0f, 1.0f, 0.65f));
+    params.push_back(makeFloat(ParamIDs::secondaryColorR, "Secondary Color R", 0.0f, 1.0f, 0.05f));
+    params.push_back(makeFloat(ParamIDs::secondaryColorG, "Secondary Color G", 0.0f, 1.0f, 0.25f));
+    params.push_back(makeFloat(ParamIDs::secondaryColorB, "Secondary Color B", 0.0f, 1.0f, 0.95f));
+
     return { params.begin(), params.end() };
 }
 
@@ -70,7 +90,7 @@ const std::vector<ParamGroupInfo>& paramGroups()
         { "Fractal Detail", { ParamIDs::iterations, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion,
                                ParamIDs::feedbackAmount } },
         { "Color", { ParamIDs::hue, ParamIDs::saturation, ParamIDs::brightness, ParamIDs::contrast,
-                      ParamIDs::palette } },
+                      ParamIDs::palette, ParamIDs::colorOverride } },
         { "Post FX: Trails & Flame", { ParamIDs::trails, ParamIDs::trailDirection, ParamIDs::flame } },
         { "Post FX: Filters", { ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::shine,
                                  ParamIDs::gummy, ParamIDs::posterize, ParamIDs::fisheye,
@@ -194,7 +214,7 @@ bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID)
         ParamIDs::trails, ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::bloomIntensity,
         ParamIDs::vignette, ParamIDs::chromaticAberration, ParamIDs::colorCycleSpeed, ParamIDs::pulseDepth,
         ParamIDs::posterize, ParamIDs::fisheye, ParamIDs::trailDirection, ParamIDs::flame, ParamIDs::shine,
-        ParamIDs::gummy,
+        ParamIDs::gummy, ParamIDs::colorOverride,
     };
     if (std::find(alwaysRelevant.begin(), alwaysRelevant.end(), paramID) != alwaysRelevant.end())
         return true;
@@ -210,7 +230,9 @@ bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID)
 void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
 {
     presetIndex          = apvts.getRawParameterValue(ParamIDs::presetIndex);
-    presetMorph           = apvts.getRawParameterValue(ParamIDs::presetMorph);
+    layerBIndex           = apvts.getRawParameterValue(ParamIDs::layerBIndex);
+    blendMode             = apvts.getRawParameterValue(ParamIDs::blendMode);
+    layerMix               = apvts.getRawParameterValue(ParamIDs::layerMix);
     reactivity            = apvts.getRawParameterValue(ParamIDs::reactivity);
     bassGain              = apvts.getRawParameterValue(ParamIDs::bassGain);
     midGain                = apvts.getRawParameterValue(ParamIDs::midGain);
@@ -245,4 +267,12 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     flame                   = apvts.getRawParameterValue(ParamIDs::flame);
     shine                   = apvts.getRawParameterValue(ParamIDs::shine);
     gummy                   = apvts.getRawParameterValue(ParamIDs::gummy);
+
+    colorOverride           = apvts.getRawParameterValue(ParamIDs::colorOverride);
+    primaryColorR           = apvts.getRawParameterValue(ParamIDs::primaryColorR);
+    primaryColorG           = apvts.getRawParameterValue(ParamIDs::primaryColorG);
+    primaryColorB           = apvts.getRawParameterValue(ParamIDs::primaryColorB);
+    secondaryColorR         = apvts.getRawParameterValue(ParamIDs::secondaryColorR);
+    secondaryColorG         = apvts.getRawParameterValue(ParamIDs::secondaryColorG);
+    secondaryColorB         = apvts.getRawParameterValue(ParamIDs::secondaryColorB);
 }

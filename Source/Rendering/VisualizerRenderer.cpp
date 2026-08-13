@@ -7,8 +7,8 @@ using namespace juce::gl;
 namespace
 {
     // Tiny plumbing shaders, not user-facing presets: one samples a single
-    // texture (final blit to screen), one cross-fades two textures
-    // (compositing preset A / preset B while presetMorph is in motion), and
+    // texture (final blit to screen), one composites Layer A / Layer B
+    // (two independently-chosen presets) while layerMix is above zero, and
     // one is the global post-process pass (trails/blur/noise/datamosh).
     const char* blitFragSource = R"GLSL(
         #version 330 core
@@ -18,6 +18,12 @@ namespace
         void main() { fragColor = texture(uTex, vUv); }
     )GLSL";
 
+    // uBlendMode picks *how* Layer B combines with Layer A before uMix
+    // dissolves between "just A" and that combination -- matches
+    // BlendModeNames::all's order in VisualizerParameters.h. Crossfade's
+    // "blended" is simply B, so mix(a, b, t) reproduces the old
+    // (pre-Phase-4) plain-crossfade behavior exactly when Blend Mode is
+    // left at its default.
     const char* blendFragSource = R"GLSL(
         #version 330 core
         in vec2 vUv;
@@ -25,7 +31,21 @@ namespace
         uniform sampler2D uTexA;
         uniform sampler2D uTexB;
         uniform float uMix;
-        void main() { fragColor = mix(texture(uTexA, vUv), texture(uTexB, vUv), uMix); }
+        uniform float uBlendMode;
+        void main()
+        {
+            vec3 a = texture(uTexA, vUv).rgb;
+            vec3 b = texture(uTexB, vUv).rgb;
+            int mode = int(uBlendMode + 0.5);
+            vec3 blended;
+            if (mode == 1) blended = a + b;                              // Add
+            else if (mode == 2) blended = 1.0 - (1.0 - a) * (1.0 - b);   // Screen
+            else if (mode == 3) blended = a * b;                         // Multiply
+            else if (mode == 4) blended = abs(a - b);                    // Difference
+            else if (mode == 5) blended = max(a, b);                     // Lighten
+            else blended = b;                                            // Crossfade
+            fragColor = vec4(mix(a, blended, clamp(uMix, 0.0, 1.0)), 1.0);
+        }
     )GLSL";
 
     const char* postFragSource = R"GLSL(
@@ -54,6 +74,9 @@ namespace
         uniform float uFlame;
         uniform float uShine;
         uniform float uGummy;
+        uniform float uColorOverride;
+        uniform vec3 uPrimaryColor;
+        uniform vec3 uSecondaryColor;
 
         float hash(vec2 p)
         {
@@ -291,6 +314,18 @@ namespace
                 col = floor(col * levels + 0.5) / levels;
             }
 
+            // Duotone color override: remap the whole image onto a
+            // luminance gradient between two user-picked colors, the same
+            // technique as a classic photo duotone effect. Default off
+            // (uColorOverride = 0) so the picked colors never matter unless
+            // this is actually turned up.
+            if (uColorOverride > 0.001)
+            {
+                float lum = dot(clamp(col, 0.0, 1.0), vec3(0.299, 0.587, 0.114));
+                vec3 duotone = mix(uSecondaryColor, uPrimaryColor, lum);
+                col = mix(col, duotone, clamp(uColorOverride, 0.0, 1.0));
+            }
+
             fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
         }
     )GLSL";
@@ -398,6 +433,7 @@ VisualizerRenderer::BlendUniforms::BlendUniforms(juce::OpenGLShaderProgram& prog
     texA = makeUniformIfPresent(program, "uTexA");
     texB = makeUniformIfPresent(program, "uTexB");
     mixAmount = makeUniformIfPresent(program, "uMix");
+    blendMode = makeUniformIfPresent(program, "uBlendMode");
 }
 
 VisualizerRenderer::PostUniforms::PostUniforms(juce::OpenGLShaderProgram& program)
@@ -423,6 +459,9 @@ VisualizerRenderer::PostUniforms::PostUniforms(juce::OpenGLShaderProgram& progra
     flame = makeUniformIfPresent(program, "uFlame");
     shine = makeUniformIfPresent(program, "uShine");
     gummy = makeUniformIfPresent(program, "uGummy");
+    colorOverride = makeUniformIfPresent(program, "uColorOverride");
+    primaryColor = makeUniformIfPresent(program, "uPrimaryColor");
+    secondaryColor = makeUniformIfPresent(program, "uSecondaryColor");
 }
 
 VisualizerRenderer::VisualizerRenderer(AudioAnalyzer& analyzerToUse, VisualizerParameterRefs& paramsToUse)
@@ -1014,8 +1053,12 @@ void VisualizerRenderer::renderOpenGL()
 
     const float presetRaw = params.presetIndex != nullptr ? params.presetIndex->load() : 0.0f;
     const int presetA = juce::jlimit(0, numPresets - 1, juce::roundToInt(presetRaw));
-    const int presetB = (presetA + 1) % numPresets;
-    const float morph = params.presetMorph != nullptr ? juce::jlimit(0.0f, 1.0f, params.presetMorph->load()) : 0.0f;
+    // Layer B used to be forced to "whatever's next in the list" -- now an
+    // independent user choice (see ParamIDs::layerBIndex's comment).
+    const float layerBRaw = params.layerBIndex != nullptr ? params.layerBIndex->load() : (float) ((presetA + 1) % numPresets);
+    const int presetB = juce::jlimit(0, numPresets - 1, juce::roundToInt(layerBRaw));
+    const float morph = params.layerMix != nullptr ? juce::jlimit(0.0f, 1.0f, params.layerMix->load()) : 0.0f;
+    const float blendModeRaw = params.blendMode != nullptr ? params.blendMode->load() : 0.0f;
 
     juce::OpenGLFrameBuffer& historyWrite = historyFBO[pingIndex];
     juce::OpenGLFrameBuffer& historyRead = historyFBO[1 - pingIndex];
@@ -1046,6 +1089,7 @@ void VisualizerRenderer::renderOpenGL()
             glBindTexture(GL_TEXTURE_2D, scratchFBO2.getTextureID());
             setU(blendUniforms->texB, (GLint) 1);
             setU(blendUniforms->mixAmount, morph);
+            setU(blendUniforms->blendMode, blendModeRaw);
             glDrawArrays(GL_TRIANGLES, 0, 3);
         }
         rawFBO.releaseAsRenderingTarget();
@@ -1088,6 +1132,13 @@ void VisualizerRenderer::renderOpenGL()
         setU(postUniforms->flame, params.flame != nullptr ? params.flame->load() : 0.0f);
         setU(postUniforms->shine, params.shine != nullptr ? params.shine->load() : 0.0f);
         setU(postUniforms->gummy, params.gummy != nullptr ? params.gummy->load() : 0.0f);
+        setU(postUniforms->colorOverride, params.colorOverride != nullptr ? params.colorOverride->load() : 0.0f);
+        setU(postUniforms->primaryColor, params.primaryColorR != nullptr ? params.primaryColorR->load() : 1.0f,
+             params.primaryColorG != nullptr ? params.primaryColorG->load() : 0.15f,
+             params.primaryColorB != nullptr ? params.primaryColorB->load() : 0.65f);
+        setU(postUniforms->secondaryColor, params.secondaryColorR != nullptr ? params.secondaryColorR->load() : 0.05f,
+             params.secondaryColorG != nullptr ? params.secondaryColorG->load() : 0.25f,
+             params.secondaryColorB != nullptr ? params.secondaryColorB->load() : 0.95f);
 
         glDrawArrays(GL_TRIANGLES, 0, 3);
     }

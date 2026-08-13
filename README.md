@@ -118,19 +118,27 @@ Audio passes through completely unmodified — this is a pure visualizer.
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
   rolling waveform buffer, and **auto-gain** normalization so reactivity
   tracks the *dynamics* of whatever's playing instead of absolute loudness.
-- **35 automatable parameters**, including a **Palette** parameter (0–8)
+- **44 automatable parameters**, including a **Palette** parameter (0–8)
   that sweeps/crossfades through curated cosine-gradient palettes
   (Spectrum, Fire, Ice, Synthwave, Sunset, Forest, Mono, Psychedelic) on
-  top of the Hue knob, plus fifteen global post-FX (Trails, Blur, Noise,
+  top of the Hue knob, plus sixteen global post-FX (Trails, Blur, Noise,
   Datamosh, Bloom, Vignette, Chromatic Aberration, Color Cycle Speed,
-  Pulse Depth, Posterize, Fisheye, Trail Direction, Flame, Shine, Gummy).
-  Flame streams bright content along an adjustable direction (0° = up)
-  with turbulence and warm ember decay, so it reads as rising fire (or
-  drips/streaks in any direction you dial in); Shine grows anisotropic
-  star-streak specular glints out of hot spots with a glossy response
-  curve; Gummy adds a soft audio-breathing screen-space wobble plus a
-  milky response lift, so the whole image reads as translucent, lit
-  jelly. All three are 0 by default and layer on top of *any* preset.
+  Pulse Depth, Posterize, Fisheye, Trail Direction, Flame, Shine, Gummy,
+  Color Override). Flame streams bright content along an adjustable
+  direction (0° = up) with turbulence and warm ember decay, so it reads
+  as rising fire (or drips/streaks in any direction you dial in); Shine
+  grows anisotropic star-streak specular glints out of hot spots with a
+  glossy response curve; Gummy adds a soft audio-breathing screen-space
+  wobble plus a milky response lift, so the whole image reads as
+  translucent, lit jelly; Color Override remaps the whole image onto a
+  luminance gradient between two picked colors (a duotone effect) via
+  the Primary/Secondary Color swatches in the panel. All four are 0/off
+  by default and layer on top of *any* preset.
+- **Two-layer compositing**: Layer A (the main Preset dropdown) and an
+  independently-chosen **Layer B** blend together via **Layer Mix**
+  (0 = just Layer A) through a **Blend Mode** — Crossfade, Add, Screen,
+  Multiply, Difference, or Lighten — so any two presets can be layered
+  on top of each other, not just dissolved between.
 - **Manual control panel** (collapsible, scrollable, opaque backdrop so
   labels stay readable over any visual) with a slider for every parameter,
   organized into collapsible sections (Audio Reactivity, Motion & Zoom,
@@ -140,13 +148,17 @@ Audio passes through completely unmodified — this is a pure visualizer.
   see `isParamRelevantForPreset` in
   [VisualizerParameters.cpp](Source/VisualizerParameters.cpp)) so it's
   obvious at a glance what's worth touching — dimmed controls stay fully
-  functional, since switching presets or a Preset Morph can make them
+  functional, since switching presets or the Layer Mix can make them
   matter again. Sliders deliberately ignore the mouse wheel so
   wheel-scrolling the panel never yanks values.
 - **Explorer navigation**: on the explorer presets, mouse wheel / Up-Down
   arrows zoom and dragging the visual pans; over the panel the wheel just
   scrolls the panel. `[`/`]` step through presets from anywhere.
-- **Fullscreen toggle** (button or `F` key, `Esc` to exit).
+- **Fullscreen toggle** (button or `F` key, `Esc` to exit) hides the side
+  panel; **`H`** additionally hides the top-left Controls/Fullscreen
+  buttons themselves for a completely chrome-free view (press `H` again
+  to bring them back — keyboard-only, since a button can't un-hide
+  itself).
 - Builds as **VST3** and **Standalone** (JUCE multi-format target).
 
 ## How the deep zoom actually works
@@ -211,11 +223,12 @@ Shaders/
   shape_rave.frag              pipes.frag                infinite_maze.frag
 ```
 
-The renderer pipeline is two stages: the selected preset (or two, cross-
-fading, while Preset Morph is in motion) renders into an offscreen "raw"
-buffer, then a global post-process pass blends that against last frame's
-fully-processed output using Trails/Blur/Noise/Datamosh before blitting to
-screen — see the comment at the top of
+The renderer pipeline is two stages: Layer A (and Layer B too, whenever
+Layer Mix is above zero, composited via the selected Blend Mode) renders
+into an offscreen "raw" buffer, then a global post-process pass blends
+that against last frame's fully-processed output using
+Trails/Blur/Noise/Datamosh (plus, if turned up, the Color Override
+duotone remap) before blitting to screen — see the comment at the top of
 [VisualizerRenderer.h](Source/Rendering/VisualizerRenderer.h) for the exact
 data flow.
 
@@ -254,8 +267,10 @@ standalone app at
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (28) | Selects the active shader preset |
-| Preset Morph | 0–1 | Cross-fades toward the *next* preset in the list |
+| Preset | choice (28) | Selects Layer A, the main active shader preset |
+| Layer B | choice (28) | The second, independently-chosen preset Layer Mix blends in |
+| Blend Mode | choice (6) | How Layer B combines with Layer A: Crossfade, Add, Screen, Multiply, Difference, Lighten |
+| Layer Mix | 0–1 | How much of Layer B (combined via Blend Mode) shows over Layer A |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
 | Bass / Mid / Treble Gain | 0–2 each | Per-band weighting before it hits the shaders |
 | Zoom Speed | -1–1 | Fractal zoom/travel rate (autopilot presets) |
@@ -287,6 +302,7 @@ standalone app at
 | Flame | 0–1 | Bright content streams/licks along Trail Direction with warm ember decay |
 | Shine | 0–1 | Anisotropic star-streak specular on hot spots + glossy response curve |
 | Gummy | 0–1 | Soft audio-breathing screen-space jelly wobble + milky response lift |
+| Color Override | 0–1 | Duotone remap toward the Primary/Secondary Color swatches (0 = original colors) |
 
 ## Adding a new preset
 

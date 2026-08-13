@@ -44,6 +44,44 @@ private:
         void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xf0121219)); }
     };
 
+    // A clickable color swatch: click it, a ColourSelector pops up in a
+    // CallOutBox, and onColourChanged fires live as the user drags around
+    // in it (not just on close) so the visual updates immediately.
+    struct ColorSwatch : juce::Component, juce::ChangeListener
+    {
+        juce::Colour colour = juce::Colours::white;
+        std::function<void(juce::Colour)> onColourChanged;
+
+        void paint(juce::Graphics& g) override
+        {
+            g.fillAll(colour);
+            g.setColour(juce::Colours::white.withAlpha(0.35f));
+            g.drawRect(getLocalBounds());
+        }
+
+        void mouseUp(const juce::MouseEvent&) override
+        {
+            auto selector = std::make_unique<juce::ColourSelector>(
+                juce::ColourSelector::showColourAtTop | juce::ColourSelector::showSliders
+                | juce::ColourSelector::showColourspace);
+            selector->setCurrentColour(colour);
+            selector->setSize(260, 300);
+            selector->addChangeListener(this);
+            juce::CallOutBox::launchAsynchronously(std::move(selector), getScreenBounds(), nullptr);
+        }
+
+        void changeListenerCallback(juce::ChangeBroadcaster* source) override
+        {
+            if (auto* cs = dynamic_cast<juce::ColourSelector*>(source))
+            {
+                colour = cs->getCurrentColour();
+                repaint();
+                if (onColourChanged != nullptr)
+                    onColourChanged(colour);
+            }
+        }
+    };
+
     struct ParamSlider
     {
         juce::Slider slider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
@@ -82,6 +120,13 @@ private:
     void openImageChooser();
     void loadImageFromFile(const juce::File& file);
 
+    // Pushes a picked ColorSwatch colour into the three 0..1 R/G/B APVTS
+    // params it's bound to (there's no single "colour" param type in
+    // APVTS, so each swatch drives three plain floats).
+    void pushColourToParams(const juce::Colour& colour, const juce::String& rId, const juce::String& gId,
+                             const juce::String& bId);
+    juce::Colour readColourFromParams(const juce::String& rId, const juce::String& gId, const juce::String& bId) const;
+
     // Re-reads the current preset and dims/disables whichever sliders it
     // doesn't use. Called once at startup and on a light poll thereafter
     // (parameter changes can arrive from the audio thread via host
@@ -99,6 +144,13 @@ private:
     ControlsPanel controlsContent;
 
     bool isFullscreenActive = false;
+    // Independent of isFullscreenActive/controlsViewport -- just hides the
+    // top-left "Controls"/"Fullscreen" buttons themselves, since fullscreen
+    // mode already hides the side panel but left those two buttons sitting
+    // on screen. Toggled with 'H'; there's no button for this one, since
+    // hiding buttons via a button they'd then have no way to un-hide is
+    // circular -- keyboard-only, like a few other hotkeys here.
+    bool topBarHidden = false;
     juce::Point<float> lastDragPosition;
     int lastKnownPresetIndex = -1;
 
@@ -106,7 +158,25 @@ private:
     juce::Label presetLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> presetAttachment;
 
-    std::unique_ptr<ParamSlider> presetMorphSlider; // always visible, ungrouped, never dimmed
+    // Layer B / Blend Mode / Layer Mix: always visible, ungrouped, never
+    // dimmed by updateParamRelevance -- same treatment as the Preset combo
+    // above, since which preset(s) are showing isn't itself a per-preset-
+    // relevant setting.
+    juce::ComboBox layerBBox;
+    juce::Label layerBLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> layerBAttachment;
+    juce::ComboBox blendModeBox;
+    juce::Label blendModeLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> blendModeAttachment;
+    std::unique_ptr<ParamSlider> layerMixSlider;
+
+    // Primary/Secondary color swatches -- also always visible/ungrouped;
+    // the Color Override amount slider that actually enables their effect
+    // lives in the generic Color group (paramGroups()) instead, since it's
+    // a normal 0..1 automatable float like Shine/Gummy/etc.
+    ColorSwatch primaryColorSwatch, secondaryColorSwatch;
+    juce::Label primaryColorLabel, secondaryColorLabel;
+
     juce::OwnedArray<ParamGroupUI> paramGroupUIs;
 
     juce::TextButton loadImageButton { "Load Image..." };

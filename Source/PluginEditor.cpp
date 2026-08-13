@@ -38,7 +38,45 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     presetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.apvts, ParamIDs::presetIndex, presetBox);
 
-    presetMorphSlider.reset(addParamSlider(controlsContent, ParamIDs::presetMorph, "Morph To Next"));
+    layerBLabel.setText("Layer B", juce::dontSendNotification);
+    layerBLabel.setJustificationType(juce::Justification::left);
+    layerBLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    controlsContent.addAndMakeVisible(layerBLabel);
+    layerBBox.addItemList(PresetNames::all, 1);
+    controlsContent.addAndMakeVisible(layerBBox);
+    layerBAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processorRef.apvts, ParamIDs::layerBIndex, layerBBox);
+
+    blendModeLabel.setText("Blend Mode", juce::dontSendNotification);
+    blendModeLabel.setJustificationType(juce::Justification::left);
+    blendModeLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    controlsContent.addAndMakeVisible(blendModeLabel);
+    blendModeBox.addItemList(BlendModeNames::all, 1);
+    controlsContent.addAndMakeVisible(blendModeBox);
+    blendModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processorRef.apvts, ParamIDs::blendMode, blendModeBox);
+
+    layerMixSlider.reset(addParamSlider(controlsContent, ParamIDs::layerMix, "Layer Mix"));
+
+    primaryColorLabel.setText("Primary Color", juce::dontSendNotification);
+    primaryColorLabel.setJustificationType(juce::Justification::left);
+    primaryColorLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    controlsContent.addAndMakeVisible(primaryColorLabel);
+    primaryColorSwatch.colour = readColourFromParams(ParamIDs::primaryColorR, ParamIDs::primaryColorG,
+                                                       ParamIDs::primaryColorB);
+    primaryColorSwatch.onColourChanged = [this](juce::Colour c)
+    { pushColourToParams(c, ParamIDs::primaryColorR, ParamIDs::primaryColorG, ParamIDs::primaryColorB); };
+    controlsContent.addAndMakeVisible(primaryColorSwatch);
+
+    secondaryColorLabel.setText("Secondary Color", juce::dontSendNotification);
+    secondaryColorLabel.setJustificationType(juce::Justification::left);
+    secondaryColorLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    controlsContent.addAndMakeVisible(secondaryColorLabel);
+    secondaryColorSwatch.colour = readColourFromParams(ParamIDs::secondaryColorR, ParamIDs::secondaryColorG,
+                                                         ParamIDs::secondaryColorB);
+    secondaryColorSwatch.onColourChanged = [this](juce::Colour c)
+    { pushColourToParams(c, ParamIDs::secondaryColorR, ParamIDs::secondaryColorG, ParamIDs::secondaryColorB); };
+    controlsContent.addAndMakeVisible(secondaryColorSwatch);
 
     loadImageButton.onClick = [this] { openImageChooser(); };
     controlsContent.addAndMakeVisible(loadImageButton);
@@ -168,6 +206,30 @@ void KaleidosonicAudioProcessorEditor::loadImageFromFile(const juce::File& file)
     imageStatusLabel.setText(file.getFileName(), juce::dontSendNotification);
 }
 
+void KaleidosonicAudioProcessorEditor::pushColourToParams(const juce::Colour& colour, const juce::String& rId,
+                                                            const juce::String& gId, const juce::String& bId)
+{
+    auto setOne = [this](const juce::String& id, float value)
+    {
+        if (auto* param = processorRef.apvts.getParameter(id))
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+    };
+    setOne(rId, colour.getFloatRed());
+    setOne(gId, colour.getFloatGreen());
+    setOne(bId, colour.getFloatBlue());
+}
+
+juce::Colour KaleidosonicAudioProcessorEditor::readColourFromParams(const juce::String& rId, const juce::String& gId,
+                                                                      const juce::String& bId) const
+{
+    auto readOne = [this](const juce::String& id, float fallback)
+    {
+        auto* raw = processorRef.apvts.getRawParameterValue(id);
+        return raw != nullptr ? raw->load() : fallback;
+    };
+    return juce::Colour::fromFloatRGBA(readOne(rId, 1.0f), readOne(gId, 1.0f), readOne(bId, 1.0f), 1.0f);
+}
+
 void KaleidosonicAudioProcessorEditor::timerCallback()
 {
     const int current = processorRef.paramRefs.presetIndex != nullptr
@@ -217,6 +279,17 @@ bool KaleidosonicAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
     if (key == juce::KeyPress::escapeKey && isFullscreenActive)
     {
         toggleFullscreen();
+        return true;
+    }
+    // 'H' hides/shows just the top-left Controls/Fullscreen buttons --
+    // independent of 'F', since fullscreen already hides the side panel but
+    // leaves those two buttons on screen.
+    if (key.getTextCharacter() == 'h' || key.getTextCharacter() == 'H')
+    {
+        topBarHidden = ! topBarHidden;
+        toggleControlsButton.setVisible(! topBarHidden);
+        fullscreenButton.setVisible(! topBarHidden);
+        resized();
         return true;
     }
     // Up/down arrows zoom the explorer presets (no-ops elsewhere).
@@ -302,9 +375,12 @@ void KaleidosonicAudioProcessorEditor::toggleFullscreen()
 void KaleidosonicAudioProcessorEditor::resized()
 {
     auto bounds = getLocalBounds();
-    auto topBar = bounds.removeFromTop(28);
-    toggleControlsButton.setBounds(topBar.removeFromLeft(90).reduced(2));
-    fullscreenButton.setBounds(topBar.removeFromLeft(90).reduced(2));
+    if (! topBarHidden)
+    {
+        auto topBar = bounds.removeFromTop(28);
+        toggleControlsButton.setBounds(topBar.removeFromLeft(90).reduced(2));
+        fullscreenButton.setBounds(topBar.removeFromLeft(90).reduced(2));
+    }
 
     if (! controlsViewport.isVisible())
         return;
@@ -317,11 +393,13 @@ void KaleidosonicAudioProcessorEditor::resized()
     constexpr int headerHeight = 26;
     constexpr int presetRowHeight = 46;
     constexpr int imageRowHeight = 46;
+    constexpr int colorRowHeight = 46;
 
     // First pass: total content height, so the Viewport's scrollbar is
     // sized correctly before we position anything.
-    // margin + preset combo + always-visible Morph + Load Image row
-    int totalHeight = 16 + presetRowHeight + rowHeight + imageRowHeight;
+    // margin + Layer A/B combos + Blend Mode + always-visible Layer Mix +
+    // Load Image row + color swatches row
+    int totalHeight = 16 + presetRowHeight * 3 + rowHeight + imageRowHeight + colorRowHeight;
     for (auto* groupUI : paramGroupUIs)
         totalHeight += headerHeight + (groupUI->header.expanded ? rowHeight * groupUI->sliders.size() : 0);
 
@@ -332,13 +410,29 @@ void KaleidosonicAudioProcessorEditor::resized()
     presetLabel.setBounds(presetRow.removeFromTop(18));
     presetBox.setBounds(presetRow);
 
+    auto layerBRow = content.removeFromTop(presetRowHeight);
+    layerBLabel.setBounds(layerBRow.removeFromTop(18));
+    layerBBox.setBounds(layerBRow);
+
+    auto blendModeRow = content.removeFromTop(presetRowHeight);
+    blendModeLabel.setBounds(blendModeRow.removeFromTop(18));
+    blendModeBox.setBounds(blendModeRow);
+
     auto morphRow = content.removeFromTop(rowHeight);
-    presetMorphSlider->label.setBounds(morphRow.removeFromTop(18));
-    presetMorphSlider->slider.setBounds(morphRow);
+    layerMixSlider->label.setBounds(morphRow.removeFromTop(18));
+    layerMixSlider->slider.setBounds(morphRow);
 
     auto imageRow = content.removeFromTop(imageRowHeight);
     loadImageButton.setBounds(imageRow.removeFromTop(24));
     imageStatusLabel.setBounds(imageRow);
+
+    auto colorRow = content.removeFromTop(colorRowHeight);
+    auto leftColor = colorRow.removeFromLeft(colorRow.getWidth() / 2).reduced(4, 0);
+    auto rightColor = colorRow.reduced(4, 0);
+    primaryColorLabel.setBounds(leftColor.removeFromTop(18));
+    primaryColorSwatch.setBounds(leftColor);
+    secondaryColorLabel.setBounds(rightColor.removeFromTop(18));
+    secondaryColorSwatch.setBounds(rightColor);
 
     // Full-bleed section headers read as dividers cutting edge-to-edge
     // across the panel, so they're positioned in the un-reduced content

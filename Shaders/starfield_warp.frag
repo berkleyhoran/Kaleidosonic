@@ -1,6 +1,10 @@
 // Starfield Warp — flying through stars at warp speed, radiating outward
 // from center. Cheap, punchy, and a deliberate change of pace from the
-// fractal-heavy presets. Bass and onsets slam the warp speed.
+// fractal-heavy presets. Bass and onsets slam the warp speed. When an
+// image (or GIF) is loaded, each star's color comes from the picture at
+// that star's fixed launch direction instead of the hue sweep -- since
+// the direction (not the animated depth) is what stays constant per
+// star, it reads as flying through the photo itself.
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -34,6 +38,11 @@ void main()
 
         float hue = fract(uHue + hash1(seed + 3.0) * 0.3 + uTime * 0.02);
         vec3 sc = hsv2rgb(vec3(hue, uSaturation * 0.5, 1.0));
+        if (uUserImageLoaded > 0.5)
+        {
+            vec4 imgC = sampleUserImage(imageContainUV(dir * 0.5, uUserImageAspect));
+            sc = mix(sc, imgC.rgb, imgC.a);
+        }
         float streak = clamp(1.0 / (z * z), 0.0, 3.0);
         col += sc * star * (0.5 + streak * 0.4) * (0.5 + uLevel * react);
     }

@@ -1,7 +1,11 @@
 // Particle Bloom — a procedural field of glowing particles (no geometry,
 // just per-pixel accumulated glow), orbiting, pulsing, and exploding
 // outward with the audio. Folded through the kaleidoscope for a symmetric
-// mandala of particles.
+// mandala of particles. When an image (or GIF) is loaded, each particle
+// picks up its color from whatever the picture shows at that particle's
+// own orbit position instead of the procedural hue sweep -- particles
+// outside the picture's bounds (or with no image loaded at all) still
+// fall back to the hue sweep, so it degrades gracefully either way.
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -36,6 +40,11 @@ void main()
 
         float hue = fract(uHue + seed * 0.11 + uTime * 0.03 + uTreble * react * 0.7);
         vec3 pc = hsv2rgb(vec3(hue, uSaturation, 1.0));
+        if (uUserImageLoaded > 0.5)
+        {
+            vec4 imgC = sampleUserImage(imageContainUV(pos, uUserImageAspect));
+            pc = mix(pc, imgC.rgb, imgC.a);
+        }
         col += pc * g * (0.5 + 0.9 * uLevel * react);
     }
 

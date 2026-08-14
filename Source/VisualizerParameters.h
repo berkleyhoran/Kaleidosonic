@@ -116,7 +116,11 @@ namespace PresetNames
         "Image Kaleidoscope",
         "Shape Rave",
         "Pipes",
-        "Infinite Maze"
+        "Infinite Maze",
+        "Rotating Light Logo",
+        "Wireframe Tunnel",
+        "Metaballs",
+        "Crystal Cave"
     };
 }
 

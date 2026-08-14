@@ -4,7 +4,11 @@
 // Audio-reactive by construction: bass drives the warp amplitude (the
 // clouds physically churn on low end), treble adds a fine shimmer octave,
 // level breathes the density, and onsets flash lightning through the
-// cloud body along ridged-noise filaments.
+// cloud body along ridged-noise filaments. When an image (or GIF) is
+// loaded, its colors replace most of the palette underneath the cloud
+// body (sampled at plain screen UV, so the picture reads as sitting
+// still behind the churning smoke) -- a little palette shows through so
+// it doesn't look like a flat cutout.
 
 float nHash(vec2 p)
 {
@@ -60,6 +64,11 @@ void main()
     // (q/r make great free color variety), breathing with the level.
     float t = density * 1.25 + r.x * 0.35 + uTime * 0.012;
     vec3 col = palette(t, uHue);
+    if (uUserImageLoaded > 0.5)
+    {
+        vec4 imgC = sampleUserImage(imageContainUV(uv, uUserImageAspect));
+        col = mix(col, imgC.rgb, imgC.a * 0.85);
+    }
     float body = smoothstep(0.25, 0.95, density);
     col *= body * (0.55 + uLevel * react * 1.1) + 0.03;
 

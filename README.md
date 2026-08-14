@@ -11,7 +11,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **28 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **32 GLSL presets**, switchable and cross-fadable while the DAW automates
   them:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
@@ -64,7 +64,8 @@ Audio passes through completely unmodified — this is a pure visualizer.
     along ridged-noise filaments.
   - **Image Ripple / Image Shatter / Image Kaleidoscope** — three presets
     built around a picture you load yourself ("Load Image..." in the
-    control panel; the file path is remembered across sessions). Ripple
+    control panel; the file path is remembered across sessions, and
+    **animated GIFs play back frame-accurately** -- see below). Ripple
     displaces the image in concentric sine rings like water, bass driving
     a slow swell and treble a fine ripple, with onsets spawning fresh
     expanding rings and a chromatic offset scaled by local ripple
@@ -78,7 +79,11 @@ Audio passes through completely unmodified — this is a pure visualizer.
     endless mosaic tunnel with a bounded bass-driven breathing zoom --
     deliberately not an unbounded dive, since a plain texture sample has
     no fractal detail to reveal by going deeper. All three show a gentle
-    pulsing placeholder until an image is actually loaded.
+    pulsing placeholder until an image is actually loaded. Four more
+    presets (**Particle Bloom**, **Starfield Warp**, **Audio Nebula**,
+    **Fractal Bubbles**) also pick up an image when one's loaded --
+    coloring their particles/stars/clouds/bubbles from it instead of the
+    palette sweep, falling back gracefully wherever it doesn't apply.
   - **Shape Rave** — a raymarched field of rounded boxes, tori, and
     spheres extending infinitely in every direction via domain repetition
     (`mod`-folding the sample point back into one cell, like Mandelbox's
@@ -114,6 +119,46 @@ Audio passes through completely unmodified — this is a pure visualizer.
     Corridors are rendered wide with only thin pillars/wall-slabs (not
     filling their whole grid cell) so the walk reads as roomy rather than
     scraping the walls.
+  - **Rotating Light Logo** — the loaded picture (or GIF) redrawn as a
+    disc of individually-lit points, like a light-bulb marquee sign,
+    spinning in 3D while the camera drifts around it; each point's
+    brightness comes from the image at its own grid cell and breathes on
+    its own hashed sine-wave phase, so the grid twinkles rather than
+    pulsing as one block. Deliberately an analytic ray-*plane*
+    intersection rather than a raymarched heightfield -- Shape Rave's
+    header comment explains why a discontinuous per-cell field isn't a
+    real distance estimator and would risk the same overshoot artifacts
+    that took two fixes to chase down there.
+  - **Wireframe Tunnel** — a classic demoscene vector-tunnel flythrough:
+    neon hoops stacked down the Z axis connected by longitudinal rails,
+    both genuinely thin (radius ~0.02) rather than solid walls, so the
+    image is built mostly from the glow accumulator's halo around
+    near-misses instead of direct hit-shading -- the soft-neon-line look
+    a wireframe needs. Both hoops and rails are torus/capsule primitives
+    (true distance estimators, no discontinuities).
+  - **Metaballs** — a cluster of orbiting spheres fused into one
+    wobbling, breathing organic blob via the standard smooth-min CSG
+    blend, camera slowly circling the whole cluster. Bass swells each
+    ball's radius and the blend softness together so the fuse visibly
+    breathes on the beat; picks up a loaded image's colors across the
+    fused surface by world position.
+  - **Crystal Cave** — a fixed cluster of faceted crystal shards
+    (rotated, stretched boxes -- their flat faces and sharp edges give a
+    genuinely faceted look for free), camera orbiting the formation. Each
+    facet's color shifts by which way its face points, layered over a
+    palette base and a strong specular glint, so it reads as cut crystal
+    rather than plain colored glass; onset strobes a camera-flash across
+    every facet at once.
+- **Animated GIF playback**: the same "Load Image..." picker used by the
+  image-reactive presets above decodes every frame of a `.gif` (via a
+  vendored [stb_image](https://github.com/nothings/stb) decoder --
+  JUCE's own image loader only ever gives you a GIF's first frame) and
+  plays them back at their real per-frame timing, looping automatically.
+  Every image-reactive preset (and the duotone-adjacent presets that
+  merely *sample* an image) animates for free -- they just keep reading
+  the same `uUserImage` texture as always; only the CPU-side frame
+  advance is new. See
+  [Source/Rendering/GifDecoder.h](Source/Rendering/GifDecoder.h).
 - **Real-time audio analysis** (FFT-based): bass/mid/treble band energy,
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
   rolling waveform buffer, and **auto-gain** normalization so reactivity
@@ -211,6 +256,9 @@ Source/
   Rendering/DoubleDouble.h        Double-double (~32 digit) CPU arithmetic for reference orbits
   Rendering/PipeNetwork.*         Pipes preset: grows/animates the joint chains, no GPU precision needed
   Rendering/MazeWalker.*          Infinite Maze preset: autonomous navigation through the hashed maze
+  Rendering/GifDecoder.*          Thin wrapper around vendored stb_image for animated-GIF frame decode
+ThirdParty/
+  stb_image.h                 Vendored (public domain), GIF-decode-only build -- see GifDecoder.cpp
 Shaders/
   common.glsl                Shared uniforms/helpers (double-float math,
                               perturbation core, palettes, fractal shading),
@@ -226,6 +274,8 @@ Shaders/
   starfield_warp.frag         audio_nebula.frag
   image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
   shape_rave.frag              pipes.frag                infinite_maze.frag
+  light_logo.frag               wireframe_tunnel.frag     metaballs.frag
+  crystal_cave.frag
 ```
 
 The renderer pipeline is two stages: Layer A (and Layer B too, whenever
@@ -272,8 +322,8 @@ standalone app at
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (28) | Selects Layer A, the main active shader preset |
-| Layer B | choice (28) | The second, independently-chosen preset Layer Mix blends in |
+| Preset | choice (32) | Selects Layer A, the main active shader preset |
+| Layer B | choice (32) | The second, independently-chosen preset Layer Mix blends in |
 | Blend Mode | choice (6) | How Layer B combines with Layer A: Crossfade, Add, Screen, Multiply, Difference, Lighten |
 | Layer Mix | 0–1 | How much of Layer B (combined via Blend Mode) shows over Layer A |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |

@@ -679,7 +679,7 @@ void VisualizerRenderer::newOpenGLContextCreated()
     // it rather than silently going blank.
     {
         std::lock_guard<std::mutex> lock(userImageMutex);
-        if (userImageLoaded && ! pendingImagePixels.empty())
+        if (userImageLoaded && ! pendingFrames.empty())
             userImageDirty = true;
     }
 
@@ -928,8 +928,12 @@ void VisualizerRenderer::setSourceImage(const juce::Image& image)
         }
     }
 
+    std::vector<std::vector<juce::uint8>> frames;
+    frames.push_back(std::move(pixels));
+
     std::lock_guard<std::mutex> lock(userImageMutex);
-    pendingImagePixels = std::move(pixels);
+    pendingFrames = std::move(frames);
+    pendingFrameDelaysMs = { 0 }; // single frame -- 0 means "never advance", see uploadUserImageIfDirty
     pendingImageWidth = w;
     pendingImageHeight = h;
     userImageDirty = true;
@@ -937,7 +941,28 @@ void VisualizerRenderer::setSourceImage(const juce::Image& image)
     userImageAspect = (float) w / (float) juce::jmax(h, 1);
 }
 
-void VisualizerRenderer::uploadUserImageIfDirty()
+void VisualizerRenderer::setSourceImageAnimated(std::vector<std::vector<juce::uint8>> frames,
+                                                 std::vector<int> frameDelaysMs, int width, int height)
+{
+    if (frames.empty() || width <= 0 || height <= 0)
+        return;
+    // Defensive: mismatched sizes would desync frames/delays indexing in
+    // uploadUserImageIfDirty. Pad rather than reject -- a mis-decoded
+    // delay list is a cosmetic timing bug, not worth throwing the whole
+    // load away for.
+    frameDelaysMs.resize(frames.size(), 100);
+
+    std::lock_guard<std::mutex> lock(userImageMutex);
+    pendingFrames = std::move(frames);
+    pendingFrameDelaysMs = std::move(frameDelaysMs);
+    pendingImageWidth = width;
+    pendingImageHeight = height;
+    userImageDirty = true;
+    userImageLoaded = true;
+    userImageAspect = (float) width / (float) juce::jmax(height, 1);
+}
+
+void VisualizerRenderer::uploadUserImageIfDirty(float dtSeconds)
 {
     // GL thread. userImageTexture is only 0 before the first
     // newOpenGLContextCreated() -- guard rather than upload into "no
@@ -945,26 +970,58 @@ void VisualizerRenderer::uploadUserImageIfDirty()
     if (userImageTexture == 0)
         return;
 
-    int w = 0, h = 0;
-    const juce::uint8* data = nullptr;
-    std::vector<juce::uint8> localCopy; // keeps data valid after the lock releases
-
+    bool needsUpload = false;
     {
         std::lock_guard<std::mutex> lock(userImageMutex);
-        if (! userImageDirty)
-            return;
-        localCopy = pendingImagePixels; // small relative to a one-off image load; keeps the mutex held time short
-        w = pendingImageWidth;
-        h = pendingImageHeight;
-        userImageDirty = false;
+        if (userImageDirty)
+        {
+            // Small relative to a one-off image load / a GIF's total frame
+            // count; keeps the mutex held time short either way. Width/
+            // height are copied under the same lock as the frame data --
+            // otherwise a load arriving between this copy and the
+            // glTexImage2D call below could pair one image's pixels with
+            // another's dimensions.
+            activeFrames = pendingFrames;
+            activeFrameDelaysMs = pendingFrameDelaysMs;
+            activeImageWidth = pendingImageWidth;
+            activeImageHeight = pendingImageHeight;
+            userImageDirty = false;
+            activeFrameIndex = 0;
+            frameElapsedMs = 0.0;
+            needsUpload = true;
+        }
     }
 
-    if (w <= 0 || h <= 0 || localCopy.empty())
+    if (activeFrames.empty())
         return;
-    data = localCopy.data();
+
+    if (! needsUpload && activeFrames.size() > 1)
+    {
+        // Advance through however many frames this dt actually covers --
+        // a stalled/backgrounded window catching back up shouldn't just
+        // show one frame for a giant dt and silently drop the rest.
+        frameElapsedMs += (double) dtSeconds * 1000.0;
+        int guard = 0;
+        while (activeFrameIndex < activeFrameDelaysMs.size()
+               && frameElapsedMs >= (double) activeFrameDelaysMs[activeFrameIndex] && ++guard < 64)
+        {
+            frameElapsedMs -= (double) activeFrameDelaysMs[activeFrameIndex];
+            activeFrameIndex = (activeFrameIndex + 1) % activeFrames.size();
+            needsUpload = true;
+        }
+    }
+
+    if (! needsUpload)
+        return;
+
+    activeFrameIndex = juce::jmin(activeFrameIndex, activeFrames.size() - 1);
+    const auto& pixels = activeFrames[activeFrameIndex];
+    if (pixels.empty() || activeImageWidth <= 0 || activeImageHeight <= 0)
+        return;
 
     glBindTexture(GL_TEXTURE_2D, userImageTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, activeImageWidth, activeImageHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 pixels.data());
 }
 
 void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTex, float onsetEnv, int presetIndex)
@@ -1112,7 +1169,7 @@ void VisualizerRenderer::renderOpenGL()
     onsetEnvelope = std::max(onsetEnvelope * decay, onsetPulse);
 
     updateWaveformTexture();
-    uploadUserImageIfDirty();
+    uploadUserImageIfDirty(dt);
     updateNavigators(dt);
 
     const int numPresets = (int) presets.size();

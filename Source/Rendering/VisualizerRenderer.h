@@ -49,6 +49,16 @@ public:
     // picker action; keeps the GL thread free of image-decode work).
     void setSourceImage(const juce::Image& image);
 
+    // Same idea, for an animated GIF: hands over every decoded frame plus
+    // each one's hold time (see GifDecoder.h). Frame 0 shows immediately;
+    // uploadUserImageIfDirty() advances through the rest on its own each
+    // frame according to the delays, no further calls needed. Passing a
+    // single-frame sequence works too (behaves exactly like a static
+    // image) but callers should prefer setSourceImage() for that --
+    // JUCE's own decoders are lighter weight for the common PNG/JPG case.
+    void setSourceImageAnimated(std::vector<std::vector<juce::uint8>> frames, std::vector<int> frameDelaysMs,
+                                 int width, int height);
+
     // juce::OpenGLRenderer
     void newOpenGLContextCreated() override;
     void renderOpenGL() override;
@@ -177,20 +187,36 @@ private:
     std::array<float, (size_t) AudioAnalyzer::waveformSize> waveformSnapshot {};
 
     // User-uploaded image (Load Image... in the editor) for the
-    // image-reactive presets. setSourceImage() (message thread) decodes
-    // to a raw RGBA buffer and stashes it here under the mutex;
-    // uploadUserImageIfDirty() (GL thread, once per frame) picks it up
-    // and does the actual glTexImage2D call. This is the only cross-
-    // thread handoff in the renderer -- everything else here already
-    // runs entirely on the GL thread.
+    // image-reactive presets, and for GIF -- animated, so "the image" is a
+    // sequence of frames with per-frame hold times rather than one buffer.
+    // setSourceImage()/setSourceImageAnimated() (message thread) decode to
+    // raw RGBA frame(s) and stash them here under the mutex;
+    // uploadUserImageIfDirty() (GL thread, once per frame) picks up a new
+    // sequence when one arrives and advances/re-uploads the current frame
+    // as its hold time elapses. This is the only cross-thread handoff in
+    // the renderer -- everything else here already runs entirely on the
+    // GL thread. A static (non-GIF) image is just the one-frame case, so
+    // the shaders and every existing image-reactive preset need no
+    // changes at all -- they still just read uUserImage as always.
     std::mutex userImageMutex;
-    std::vector<juce::uint8> pendingImagePixels;
+    std::vector<std::vector<juce::uint8>> pendingFrames;
+    std::vector<int> pendingFrameDelaysMs;
     int pendingImageWidth = 0, pendingImageHeight = 0;
     bool userImageDirty = false;
+
+    // GL-thread-only playback state, swapped in wholesale from the pending
+    // fields above whenever userImageDirty is picked up -- never touched
+    // by the message thread, so no locking needed here.
+    std::vector<std::vector<juce::uint8>> activeFrames;
+    std::vector<int> activeFrameDelaysMs;
+    int activeImageWidth = 0, activeImageHeight = 0;
+    size_t activeFrameIndex = 0;
+    double frameElapsedMs = 0.0;
+
     GLuint userImageTexture = 0;
     float userImageAspect = 1.0f;
     bool userImageLoaded = false;
-    void uploadUserImageIfDirty();
+    void uploadUserImageIfDirty(float dtSeconds);
 
     // "Pipes" preset state (see PipeNetwork.h) -- grown each frame in
     // updateNavigators() alongside the fractal navigators, uploaded to a

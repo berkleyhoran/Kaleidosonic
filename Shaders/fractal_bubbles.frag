@@ -2,6 +2,9 @@
 // Sierpinski chaos-game point set (the same "converge toward a random
 // corner" process real fractal generators use), so the cloud of bubbles is
 // itself a fractal point distribution, drifting and popping with the audio.
+// When an image (or GIF) is loaded, each bubble is tinted by the picture
+// at its own base (pre-drift) position -- like the photo is floating
+// behind the bubble field and each bubble is a little lens onto it.
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -51,6 +54,11 @@ void main()
 
         float hue = fract(uHue + seed * 0.05 + depth * 0.3 + uTime * 0.02 + uTreble * react * 0.5);
         vec3 bc = hsv2rgb(vec3(hue, uSaturation * 0.7, 1.0));
+        if (uUserImageLoaded > 0.5)
+        {
+            vec4 imgC = sampleUserImage(imageContainUV(base, uUserImageAspect));
+            bc = mix(bc, imgC.rgb, imgC.a);
+        }
 
         col += bc * bubble * 0.18 * (0.4 + depth) * (0.6 + uLevel * react * 1.3);
         col += vec3(1.0) * rim * 0.35 * (0.5 + depth);

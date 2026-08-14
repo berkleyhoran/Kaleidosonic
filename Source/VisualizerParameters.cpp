@@ -200,6 +200,18 @@ namespace
             /* 27 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
+            /* 28 Rotating Light Logo */
+            { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 29 Wireframe Tunnel */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
+            /* 30 Metaballs */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
+              ParamIDs::cameraScale, ParamIDs::palette },
+            /* 31 Crystal Cave */
+            { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
         };
         return table;
     }

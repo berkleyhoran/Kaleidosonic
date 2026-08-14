@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "Rendering/GifDecoder.h"
 
 void KaleidosonicAudioProcessorEditor::GroupHeader::paint(juce::Graphics& g)
 {
@@ -194,6 +195,37 @@ void KaleidosonicAudioProcessorEditor::openImageChooser()
 
 void KaleidosonicAudioProcessorEditor::loadImageFromFile(const juce::File& file)
 {
+    // GIFs need their own path: JUCE's own ImageFileFormat only ever
+    // decodes a GIF's first frame (no animation API), so animated
+    // playback goes through the vendored stb_image decoder instead (see
+    // GifDecoder.h) -- everything else (PNG/JPG/BMP) still goes through
+    // JUCE as before, which is the lighter-weight/better-tested path for
+    // those formats.
+    if (file.hasFileExtension("gif"))
+    {
+        juce::MemoryBlock raw;
+        if (! file.loadFileAsData(raw))
+        {
+            imageStatusLabel.setText("Couldn't read \"" + file.getFileName() + "\"", juce::dontSendNotification);
+            return;
+        }
+
+        auto gif = decodeGif(static_cast<const uint8_t*>(raw.getData()), raw.getSize());
+        if (! gif.ok)
+        {
+            imageStatusLabel.setText("Couldn't decode \"" + file.getFileName() + "\"", juce::dontSendNotification);
+            return;
+        }
+
+        const int numFrames = (int) gif.frames.size();
+        renderer.setSourceImageAnimated(std::move(gif.frames), std::move(gif.frameDelaysMs), gif.width, gif.height);
+        processorRef.setImagePath(file.getFullPathName());
+        imageStatusLabel.setText(file.getFileName()
+                                      + (numFrames > 1 ? " (" + juce::String(numFrames) + " frames)" : ""),
+                                  juce::dontSendNotification);
+        return;
+    }
+
     const auto image = juce::ImageFileFormat::loadFrom(file);
     if (! image.isValid())
     {

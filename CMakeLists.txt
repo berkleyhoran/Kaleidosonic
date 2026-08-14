@@ -66,7 +66,8 @@ target_sources(Kaleidosonic PRIVATE
     Source/Rendering/VisualizerRenderer.cpp
     Source/Rendering/FractalNavigator.cpp
     Source/Rendering/PipeNetwork.cpp
-    Source/Rendering/MazeWalker.cpp)
+    Source/Rendering/MazeWalker.cpp
+    Source/Rendering/GifDecoder.cpp)
 
 target_compile_definitions(Kaleidosonic PUBLIC
     JUCE_WEB_BROWSER=0

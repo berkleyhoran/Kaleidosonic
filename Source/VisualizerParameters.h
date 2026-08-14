@@ -115,12 +115,17 @@ namespace PresetNames
         "Image Shatter",
         "Image Kaleidoscope",
         "Shape Rave",
-        "Pipes",
         "Infinite Maze",
         "Rotating Light Logo",
         "Wireframe Tunnel",
         "Metaballs",
-        "Crystal Cave"
+        "Crystal Cave",
+        "Spectrum Bars",
+        "Radial Spectrum",
+        "Stereo Field",
+        "Wispy Ribbons",
+        "Neon Logo",
+        "Logo Hologram"
     };
 }
 

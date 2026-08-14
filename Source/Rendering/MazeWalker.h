@@ -30,8 +30,7 @@ public:
 
     // dt: seconds since last call, already clamped by the caller.
     // speed: world units per second the walker should move at,
-    // audio-reactive the same way FractalNavigator's zoom rate and
-    // PipeNetwork's growth rate are.
+    // audio-reactive the same way FractalNavigator's zoom rate is.
     // turnBias: 0..1, how likely a junction is to turn rather than
     // continue straight when both are open -- driven up on strong beats
     // so the walk visibly reacts instead of wandering at a flat rate.

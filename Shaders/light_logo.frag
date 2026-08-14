@@ -33,7 +33,15 @@ float placeholderLum(vec2 uv)
 }
 
 const float kDiskRadius = 6.0;
-const float kGridN = 42.0; // points across the disc's diameter
+// Points across the disc's diameter. This is a flat ray-*plane*
+// intersection (see the big comment up top), not a raymarched loop, so
+// each pixel does one fixed-cost cell lookup regardless of how fine the
+// grid is -- raising this is essentially free performance-wise. Bumped
+// from 42 to 132 after the original density read as "a pile of circles"
+// rather than the actual logo/picture at anything but point-blank zoom;
+// 132 is dense enough for real logo detail/text to be legible while still
+// keeping the individually-lit-bulb look up close.
+const float kGridN = 132.0;
 
 void main()
 {

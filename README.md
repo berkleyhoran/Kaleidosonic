@@ -11,7 +11,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **32 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **37 GLSL presets**, switchable and cross-fadable while the DAW automates
   them:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
@@ -97,22 +97,6 @@ Audio passes through completely unmodified — this is a pure visualizer.
     straight into a shape is a real, if occasional, event, and
     raymarching from inside/right at a surface is what produces
     checkerboard-y noise (the step size collapses toward zero).
-  - **Pipes** — a homage to the classic Windows pipes screensaver. Five
-    pipes each grow one grid segment at a time, elbowing at right angles
-    only, until each fills its joint budget, holds a moment so the
-    finished shape actually reads, then clears and restarts with a new
-    color. The joint chain is raymarched as a run of capsules; the
-    leading segment interpolates smoothly toward its next joint every
-    frame (not just once fully grown) so the pipes visibly extrude rather
-    than popping into place in discrete unit-length jumps. A glowing
-    pulse of energy travels down each pipe from its start joint, onsets
-    kicking a fresh one loose. The raymarch skips a pipe's entire segment
-    chain with one bounding-sphere check whenever it's nowhere near the
-    ray, and stops each pipe's inner loop at however many joints are
-    actually real instead of always walking to the per-pipe budget --
-    the fix for this preset being reported as laggy, which traced to
-    always evaluating up to 27,500 capsule distances per pixel per frame
-    regardless of how much was actually visible.
   - **Infinite Maze** — a Wolfenstein-style autonomous walk through a
     procedurally-hashed pillar maze that never repeats and needs no
     storage at all: every cell's wall/open state is a pure function of
@@ -136,7 +120,42 @@ Audio passes through completely unmodified — this is a pure visualizer.
     intersection rather than a raymarched heightfield -- Shape Rave's
     header comment explains why a discontinuous per-cell field isn't a
     real distance estimator and would risk the same overshoot artifacts
-    that took two fixes to chase down there.
+    that took two fixes to chase down there. The point grid is 132×132 --
+    since this is one flat-plane intersection per pixel rather than a
+    loop, raising the density cost nothing and fixed the disc reading as
+    an indistinct pile of circles instead of the actual logo.
+  - **Neon Logo** — the loaded picture/logo redrawn as a glowing neon-tube
+    outline: a cheap 4-tap luminance-gradient edge trace, colored, and
+    left for the existing Bloom Intensity post-FX to actually bloom, with
+    a real neon-tube flicker (mostly steady, occasional hashed dips,
+    harder flicker forced on every onset).
+  - **Logo Hologram** — the loaded picture/logo as a cyan-tinted
+    holographic projection: fine scanlines, RGB channel splitting
+    (chromatic aberration), and a bright scan band that sweeps down and
+    wraps, brightening whatever it currently passes over.
+  - **Spectrum Bars** / **Radial Spectrum** — real per-band FFT magnitude
+    (not the collapsed bass/mid/treble scalars every other preset reads --
+    see `AudioAnalyzer::numSpectrumBars`, 48 log-spaced bars ~40Hz-16kHz)
+    drawn as an actual analyzer: Spectrum Bars mirrors bars symmetrically
+    above/below a center line, Radial Spectrum bends the same data into a
+    spinning ring of spokes. Cool blue/cyan/violet by default (a fixed
+    hue bias independent of the Hue knob), since these read as
+    instrumentation rather than an abstract visual.
+  - **Stereo Field** — a real goniometer/vectorscope: L/R sample pairs
+    (`AudioAnalyzer::stereoScopeSize`, a 1024-sample ring buffer captured
+    pre-downmix) plotted the classic rotated way -- x = L-R (width axis),
+    y = L+R (mono axis) -- so mono content collapses to a vertical line
+    and wide/decorrelated content spreads sideways. Tints red as phase
+    correlation goes negative, a real mono-collapse early warning rather
+    than pure decoration. Only 128 of the 1024 samples are actually
+    plotted per frame (same fixed-small-loop-of-glowing-points technique
+    Particle Bloom already uses) so it stays cheap regardless of buffer
+    size.
+  - **Wispy Ribbons** — flowing silk-like bands drifting across the
+    screen, each one's centerline a closed-form layered-sine function of
+    x (no domain warping, no raymarching) -- a small fixed loop of cheap
+    sine evaluations per pixel, deliberately built this way so it can't
+    end up costing what Pipes used to.
   - **Wireframe Tunnel** — a classic demoscene vector-tunnel flythrough:
     neon hoops stacked down the Z axis connected by longitudinal rails,
     both genuinely thin (radius ~0.02) rather than solid walls, so the
@@ -169,8 +188,11 @@ Audio passes through completely unmodified — this is a pure visualizer.
   [Source/Rendering/GifDecoder.h](Source/Rendering/GifDecoder.h).
 - **Real-time audio analysis** (FFT-based): bass/mid/treble band energy,
   overall level, spectral-flux onset ("beat") detection, a 2048-sample
-  rolling waveform buffer, and **auto-gain** normalization so reactivity
-  tracks the *dynamics* of whatever's playing instead of absolute loudness.
+  rolling waveform buffer, a real 48-bar log-spaced spectrum (Spectrum
+  Bars/Radial Spectrum), stereo width + phase correlation computed
+  pre-downmix plus a 1024-sample L/R scope ring buffer (Stereo Field), and
+  **auto-gain** normalization so reactivity tracks the *dynamics* of
+  whatever's playing instead of absolute loudness.
 - **46 automatable parameters**, including a **Palette** parameter (0–8)
   that sweeps/crossfades through curated cosine-gradient palettes
   (Spectrum, Fire, Ice, Synthwave, Sunset, Forest, Mono, Psychedelic) on
@@ -262,7 +284,6 @@ Source/
                                    on the message thread, uploaded lazily on the GL thread
   Rendering/FractalNavigator.*    CPU boundary-bisection autopilot + manual explorer navigation
   Rendering/DoubleDouble.h        Double-double (~32 digit) CPU arithmetic for reference orbits
-  Rendering/PipeNetwork.*         Pipes preset: grows/animates the joint chains, no GPU precision needed
   Rendering/MazeWalker.*          Infinite Maze preset: autonomous navigation through the hashed maze
   Rendering/GifDecoder.*          Thin wrapper around vendored stb_image for animated-GIF frame decode
 ThirdParty/
@@ -281,9 +302,10 @@ Shaders/
   oscilloscope.frag           waveform_scope.frag      fractal_bubbles.frag
   starfield_warp.frag         audio_nebula.frag
   image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
-  shape_rave.frag              pipes.frag                infinite_maze.frag
-  light_logo.frag               wireframe_tunnel.frag     metaballs.frag
-  crystal_cave.frag
+  shape_rave.frag              infinite_maze.frag       light_logo.frag
+  wireframe_tunnel.frag         metaballs.frag           crystal_cave.frag
+  spectrum_bars.frag            radial_spectrum.frag     stereo_field.frag
+  wispy_ribbons.frag             neon_logo.frag           logo_hologram.frag
 ```
 
 The renderer pipeline is two stages: Layer A (and Layer B too, whenever
@@ -370,8 +392,8 @@ first launch -- expected for now, not a broken build.
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (32) | Selects Layer A, the main active shader preset |
-| Layer B | choice (32) | The second, independently-chosen preset Layer Mix blends in |
+| Preset | choice (37) | Selects Layer A, the main active shader preset |
+| Layer B | choice (37) | The second, independently-chosen preset Layer Mix blends in |
 | Blend Mode | choice (6) | How Layer B combines with Layer A: Crossfade, Add, Screen, Multiply, Difference, Lighten |
 | Layer Mix | 0–1 | How much of Layer B (combined via Blend Mode) shows over Layer A |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |

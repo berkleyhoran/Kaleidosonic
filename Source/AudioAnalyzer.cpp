@@ -52,6 +52,21 @@ void AudioAnalyzer::prepare(double newSampleRate, int /*samplesPerBlock*/)
     for (auto& s : waveform)
         s.store(0.0f, std::memory_order_relaxed);
     waveformWriteIndex.store(0, std::memory_order_relaxed);
+
+    stereoWidth = 0.0f;
+    correlation = 1.0f;
+    widthSmoothed = 0.0f;
+    correlationSmoothed = 1.0f;
+    for (auto& s : scopeLeft)
+        s.store(0.0f, std::memory_order_relaxed);
+    for (auto& s : scopeRight)
+        s.store(0.0f, std::memory_order_relaxed);
+    scopeWriteIndex.store(0, std::memory_order_relaxed);
+
+    for (auto& s : spectrum)
+        s.store(0.0f, std::memory_order_relaxed);
+    spectrumSmoothed.fill(0.0f);
+    spectrumPeaks.fill(0.05f);
 }
 
 void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
@@ -63,8 +78,30 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
 
     float blockSumSquares = 0.0f;
 
+    // Pre-downmix L/R for stereo width/correlation and the goniometer scope
+    // -- everything else in this function still works from the mono `sample`
+    // below, so this is purely additive. A mono source (numChannels == 1)
+    // naturally reads as R == L, i.e. zero width / full correlation.
+    float sumLL = 0.0f, sumRR = 0.0f, sumLR = 0.0f, sumMidSq = 0.0f, sumSideSq = 0.0f;
+
     for (int i = 0; i < numSamples; ++i)
     {
+        const float l = buffer.getSample(0, i);
+        const float r = numChannels > 1 ? buffer.getSample(1, i) : l;
+
+        sumLL += l * l;
+        sumRR += r * r;
+        sumLR += l * r;
+        const float midSample = (l + r) * 0.5f;
+        const float sideSample = (l - r) * 0.5f;
+        sumMidSq += midSample * midSample;
+        sumSideSq += sideSample * sideSample;
+
+        const int scopeIndex = scopeWriteIndex.load(std::memory_order_relaxed);
+        scopeLeft[(size_t) scopeIndex].store(l, std::memory_order_relaxed);
+        scopeRight[(size_t) scopeIndex].store(r, std::memory_order_relaxed);
+        scopeWriteIndex.store((scopeIndex + 1) % stereoScopeSize, std::memory_order_relaxed);
+
         float sample = 0.0f;
         for (int ch = 0; ch < numChannels; ++ch)
             sample += buffer.getSample(ch, i);
@@ -93,6 +130,17 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
     const float dt = (float) numSamples / (float) sampleRate;
     const float levelPeakDecay = std::exp(-dt / 8.0f); // ~8s time constant
     levelAG.store(updateAutoGain(smoothedLevel, levelPeak, levelPeakDecay), std::memory_order_relaxed);
+
+    // Both already 0..1 (or -1..1) ratios of the source's own energy, so
+    // no auto-gain needed -- just smooth them so they don't flicker frame
+    // to frame on quiet/transient material.
+    const float widthTarget = juce::jlimit(0.0f, 1.0f, sumSideSq / (sumMidSq + sumSideSq + 1.0e-9f));
+    const float correlationTarget = juce::jlimit(-1.0f, 1.0f,
+        sumLR / (std::sqrt(sumLL * sumRR) + 1.0e-9f));
+    widthSmoothed = onePole(widthSmoothed, widthTarget, 0.2f);
+    correlationSmoothed = onePole(correlationSmoothed, correlationTarget, 0.2f);
+    stereoWidth.store(widthSmoothed, std::memory_order_relaxed);
+    correlation.store(correlationSmoothed, std::memory_order_relaxed);
 }
 
 void AudioAnalyzer::runFFTOnFifo()
@@ -110,6 +158,20 @@ void AudioAnalyzer::runFFTOnFifo()
     int bassCount = 0, midCount = 0, trebCount = 0;
     float flux = 0.0f;
 
+    // Log-spaced spectrum bar buckets, same magnitude data as bass/mid/
+    // treble above just cut finer -- log spacing so low-frequency bars
+    // (where music actually has most of its perceptible detail) get a fair
+    // share of the numSpectrumBars slots instead of being crushed into 1-2
+    // bars the way a linear split would.
+    constexpr float spectrumLoHz = 40.0f;
+    const float spectrumHiHz = std::min((float) (sampleRate * 0.5), 16000.0f);
+    const float logLo = std::log2(spectrumLoHz);
+    const float logHi = std::log2(spectrumHiHz);
+    std::array<float, (size_t) numSpectrumBars> barSums {};
+    std::array<int, (size_t) numSpectrumBars> barCounts {};
+    barSums.fill(0.0f);
+    barCounts.fill(0);
+
     for (int bin = 1; bin < numBins; ++bin)
     {
         const float magnitude = fftData[(size_t) bin];
@@ -121,6 +183,28 @@ void AudioAnalyzer::runFFTOnFifo()
         if (freq >= bassLoHz && freq < bassHiHz)      { bassSum += magnitude; ++bassCount; }
         else if (freq >= midLoHz && freq < midHiHz)   { midSum += magnitude; ++midCount; }
         else if (freq >= trebLoHz && freq < trebHiHz) { trebSum += magnitude; ++trebCount; }
+
+        if (freq >= spectrumLoHz && freq <= spectrumHiHz)
+        {
+            const float t = (std::log2(freq) - logLo) / (logHi - logLo);
+            const int barIndex = juce::jlimit(0, numSpectrumBars - 1, (int) (t * (float) numSpectrumBars));
+            barSums[(size_t) barIndex] += magnitude;
+            ++barCounts[(size_t) barIndex];
+        }
+    }
+
+    for (int bar = 0; bar < numSpectrumBars; ++bar)
+    {
+        const float barTarget = squash(barCounts[(size_t) bar] > 0
+                                            ? barSums[(size_t) bar] / (float) barCounts[(size_t) bar]
+                                            : 0.0f);
+        const float prevSmoothed = spectrumSmoothed[(size_t) bar];
+        const float smoothedBar = onePole(prevSmoothed, barTarget, barTarget > prevSmoothed ? 0.5f : 0.15f);
+        spectrumSmoothed[(size_t) bar] = smoothedBar;
+
+        float& peak = spectrumPeaks[(size_t) bar];
+        spectrum[(size_t) bar].store(updateAutoGain(smoothedBar, peak, std::exp(-((float) fftSize / (float) sampleRate) / 7.0f)),
+                                      std::memory_order_relaxed);
     }
 
     const float bassTarget = squash(bassCount > 0 ? bassSum / (float) bassCount : 0.0f);
@@ -160,4 +244,22 @@ void AudioAnalyzer::copyWaveform(std::array<float, (size_t) waveformSize>& out) 
         const int idx = (start + i) % waveformSize;
         out[(size_t) i] = waveform[(size_t) idx].load(std::memory_order_relaxed);
     }
+}
+
+void AudioAnalyzer::copyStereoScope(std::array<float, (size_t) stereoScopeSize>& left,
+                                     std::array<float, (size_t) stereoScopeSize>& right) const noexcept
+{
+    const int start = scopeWriteIndex.load(std::memory_order_relaxed);
+    for (int i = 0; i < stereoScopeSize; ++i)
+    {
+        const int idx = (start + i) % stereoScopeSize;
+        left[(size_t) i] = scopeLeft[(size_t) idx].load(std::memory_order_relaxed);
+        right[(size_t) i] = scopeRight[(size_t) idx].load(std::memory_order_relaxed);
+    }
+}
+
+void AudioAnalyzer::copySpectrum(std::array<float, (size_t) numSpectrumBars>& out) const noexcept
+{
+    for (int i = 0; i < numSpectrumBars; ++i)
+        out[(size_t) i] = spectrum[(size_t) i].load(std::memory_order_relaxed);
 }

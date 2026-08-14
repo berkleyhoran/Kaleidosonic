@@ -83,6 +83,26 @@ uniform float uZoomPhase;
 uniform sampler2D uPrevFrame;    // previous rendered frame, for feedback presets
 uniform sampler2D uWaveform;     // 2048x1 R32F texture of recent mono samples, oldest at x=0
 
+// Real per-band FFT spectrum (see AudioAnalyzer::numSpectrumBars) --
+// kNumSpectrumBars texels wide, R32F, log-spaced ~40Hz..16kHz, already
+// squashed/smoothed/auto-gained the same as uBass/uMid/uTreble. Keep this
+// constant in sync with AudioAnalyzer.h's numSpectrumBars by hand -- there's
+// no way to share it between C++ and GLSL directly.
+const int kNumSpectrumBars = 48;
+uniform sampler2D uSpectrum;
+
+// Stereo goniometer/Lissajous scope (see AudioAnalyzer::stereoScopeSize) --
+// kStereoScopeSize texels wide, RG32F, R = left sample, G = right sample,
+// oldest at x=0. Keep in sync with AudioAnalyzer.h's stereoScopeSize.
+const int kStereoScopeSize = 1024;
+uniform sampler2D uStereoScope;
+
+// Stereo "wideness" 0..1 (0 = mono, 1 = very wide/decorrelated) and phase
+// correlation -1..1 (+1 = in phase, 0 = decorrelated, -1 = out of phase).
+// See AudioAnalyzer::getStereoWidth()/getCorrelation() for exact definitions.
+uniform float uStereoWidth;
+uniform float uCorrelation;
+
 // User-uploaded picture (Load Image... in the editor), for the
 // image-reactive presets. uUserImageLoaded is 0 until something is
 // actually loaded, so presets can show a placeholder instead of sampling
@@ -92,27 +112,6 @@ uniform sampler2D uWaveform;     // 2048x1 R32F texture of recent mono samples, 
 uniform sampler2D uUserImage;
 uniform float uUserImageAspect;
 uniform float uUserImageLoaded;
-
-// "Pipes" preset joint positions (see Source/Rendering/PipeNetwork.h): one
-// texel per joint, (x, y, z, radius), PipeNetwork::textureWidth texels
-// wide. uPipeHuesA/uPipeHueE give each of the 5 pipes its own palette
-// phase (4 packed in the vec4, the 5th its own float -- there's no vec5).
-uniform sampler2D uPipeJoints;
-uniform vec4 uPipeHuesA;
-uniform float uPipeHueE;
-// Per-pipe bounding sphere (xyz center, w radius) over that pipe's actual
-// grown joints, and how many of its maxJointsPerPipe texture-row slots
-// are real vs. padding -- lets the raymarch skip a whole pipe's segment
-// chain with one distance check instead of always walking all of it. See
-// PipeNetwork::bounds()/jointCounts() for the full reasoning (this is
-// what actually fixed Pipes' reported lag).
-uniform vec4 uPipeBounds0;
-uniform vec4 uPipeBounds1;
-uniform vec4 uPipeBounds2;
-uniform vec4 uPipeBounds3;
-uniform vec4 uPipeBounds4;
-uniform vec4 uPipeJointCountA;
-uniform float uPipeJointCountE;
 
 // "Infinite Maze" preset camera state (see Source/Rendering/MazeWalker.h):
 // world-space (x, z) position and normalized (x, z) facing direction. No

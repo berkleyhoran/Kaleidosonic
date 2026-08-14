@@ -8,7 +8,6 @@
 #include "../AudioAnalyzer.h"
 #include "../VisualizerParameters.h"
 #include "FractalNavigator.h"
-#include "PipeNetwork.h"
 #include "MazeWalker.h"
 
 // Owns the OpenGLContext and does all GL work. Each frame:
@@ -73,9 +72,8 @@ private:
             reactivity, zoomSpeed, rotationSpeed, hue, saturation, brightness, contrast, kaleidoscopeSegments,
             feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
             fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
-            ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded, pipeJoints,
-            pipeHuesA, pipeHueE, pipeBounds0, pipeBounds1, pipeBounds2, pipeBounds3, pipeBounds4,
-            pipeJointCountA, pipeJointCountE, mazePos, mazeHeading;
+            ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded,
+            mazePos, mazeHeading, spectrum, stereoScope, stereoWidth, correlation;
     };
 
     struct CompiledPreset
@@ -187,6 +185,20 @@ private:
     GLuint waveformTexture = 0;
     std::array<float, (size_t) AudioAnalyzer::waveformSize> waveformSnapshot {};
 
+    // Real per-band spectrum (Spectrum Bars/Radial Spectrum presets): one
+    // texel per bar, R32F. Same upload pattern as waveformTexture above.
+    GLuint spectrumTexture = 0;
+    std::array<float, (size_t) AudioAnalyzer::numSpectrumBars> spectrumSnapshot {};
+    void updateSpectrumTexture();
+
+    // Stereo goniometer scope (Stereo Field preset): one texel per L/R
+    // sample pair, RG32F (R = left, G = right).
+    GLuint stereoScopeTexture = 0;
+    std::array<float, (size_t) AudioAnalyzer::stereoScopeSize> scopeLeftSnapshot {};
+    std::array<float, (size_t) AudioAnalyzer::stereoScopeSize> scopeRightSnapshot {};
+    std::array<float, (size_t) AudioAnalyzer::stereoScopeSize * 2> scopeInterleaved {};
+    void updateStereoScopeTexture();
+
     // User-uploaded image (Load Image... in the editor) for the
     // image-reactive presets, and for GIF -- animated, so "the image" is a
     // sequence of frames with per-frame hold times rather than one buffer.
@@ -218,13 +230,6 @@ private:
     float userImageAspect = 1.0f;
     bool userImageLoaded = false;
     void uploadUserImageIfDirty(float dtSeconds);
-
-    // "Pipes" preset state (see PipeNetwork.h) -- grown each frame in
-    // updateNavigators() alongside the fractal navigators, uploaded to a
-    // small joint-position texture the same way the reference orbits are.
-    PipeNetwork pipeNetwork;
-    GLuint pipeJointTexture = 0;
-    void uploadPipeTextureIfDirty();
 
     // "Infinite Maze" preset state (see MazeWalker.h) -- advanced each
     // frame alongside the other navigators. No GPU upload needed at all:

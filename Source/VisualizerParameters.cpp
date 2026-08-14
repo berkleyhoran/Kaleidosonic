@@ -194,23 +194,36 @@ namespace
             /* 25 Shape Rave */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 26 Pipes -- Zoom Speed/Camera Shake repurposed as pipe growth speed (no zoom of its own) */
-            { ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::zoomSpeed, ParamIDs::cameraShake,
-              ParamIDs::cameraScale, ParamIDs::palette },
-            /* 27 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
+            /* 26 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 28 Rotating Light Logo */
+            /* 27 Rotating Light Logo */
             { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 29 Wireframe Tunnel */
+            /* 28 Wireframe Tunnel */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 30 Metaballs */
+            /* 29 Metaballs */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 31 Crystal Cave */
+            /* 30 Crystal Cave */
             { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 31 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
+            { ParamIDs::palette },
+            /* 32 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
+               also reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
+            { ParamIDs::rotationSpeed, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 33 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
+            { ParamIDs::cameraScale, ParamIDs::palette },
+            /* 34 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
+              ParamIDs::cameraScale, ParamIDs::palette },
+            /* 35 Neon Logo -- Distortion controls traced line thickness */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 36 Logo Hologram -- Distortion controls chromatic split amount */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
               ParamIDs::palette },
         };
         return table;

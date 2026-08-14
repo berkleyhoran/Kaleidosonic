@@ -47,6 +47,36 @@ public:
     // guarantee (fine for a visualizer — a torn read is imperceptible).
     void copyWaveform(std::array<float, (size_t) waveformSize>& out) const noexcept;
 
+    // Stereo "wideness": 0 = pure mono (no side/difference signal), 1 = the
+    // side signal is as strong as the mid signal (very wide/decorrelated).
+    // Already a ratio of the source's own mid vs. side energy, so unlike
+    // the band getters above this needs no separate auto-gain version --
+    // it's inherently loudness-independent.
+    float getStereoWidth() const noexcept { return stereoWidth.load(std::memory_order_relaxed); }
+
+    // Phase correlation, -1..1: +1 = L and R are identical (mono-compatible),
+    // 0 = fully decorrelated (wide stereo), -1 = out of phase (mono-collapse
+    // risk). Standard Pearson correlation between the L and R signals.
+    float getCorrelation() const noexcept { return correlation.load(std::memory_order_relaxed); }
+
+    static constexpr int stereoScopeSize = 1024;
+
+    // Copies the most recent `stereoScopeSize` L/R sample pairs, oldest
+    // first, into `left`/`right` -- the raw data a goniometer/Lissajous
+    // preset plots directly (X = L, Y = R per point). Same torn-read
+    // tradeoff as copyWaveform above. On a mono source R mirrors L.
+    void copyStereoScope(std::array<float, (size_t) stereoScopeSize>& left,
+                          std::array<float, (size_t) stereoScopeSize>& right) const noexcept;
+
+    // Real per-band FFT magnitude, log-spaced ~40Hz..16kHz, already
+    // squashed/smoothed/auto-gained the same way the collapsed bass/mid/
+    // treble scalars above are -- for presets that want an actual spectrum
+    // display instead of 3 bands. Same FFT pass as everything else, just
+    // bucketed more finely.
+    static constexpr int numSpectrumBars = 48;
+
+    void copySpectrum(std::array<float, (size_t) numSpectrumBars>& out) const noexcept;
+
 private:
     static constexpr int fftOrder = 10;
     static constexpr int fftSize = 1 << fftOrder; // 1024
@@ -79,4 +109,17 @@ private:
 
     std::array<std::atomic<float>, (size_t) waveformSize> waveform {};
     std::atomic<int> waveformWriteIndex { 0 };
+
+    std::atomic<float> stereoWidth { 0.0f };
+    std::atomic<float> correlation { 1.0f };
+    float widthSmoothed = 0.0f;
+    float correlationSmoothed = 1.0f;
+
+    std::array<std::atomic<float>, (size_t) stereoScopeSize> scopeLeft {};
+    std::array<std::atomic<float>, (size_t) stereoScopeSize> scopeRight {};
+    std::atomic<int> scopeWriteIndex { 0 };
+
+    std::array<std::atomic<float>, (size_t) numSpectrumBars> spectrum {};
+    std::array<float, (size_t) numSpectrumBars> spectrumSmoothed {};
+    std::array<float, (size_t) numSpectrumBars> spectrumPeaks {};
 };

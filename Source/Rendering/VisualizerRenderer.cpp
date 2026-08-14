@@ -482,18 +482,12 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     userImage               = makeUniformIfPresent(program, "uUserImage");
     userImageAspect         = makeUniformIfPresent(program, "uUserImageAspect");
     userImageLoaded         = makeUniformIfPresent(program, "uUserImageLoaded");
-    pipeJoints              = makeUniformIfPresent(program, "uPipeJoints");
-    pipeHuesA               = makeUniformIfPresent(program, "uPipeHuesA");
-    pipeHueE                = makeUniformIfPresent(program, "uPipeHueE");
-    pipeBounds0             = makeUniformIfPresent(program, "uPipeBounds0");
-    pipeBounds1             = makeUniformIfPresent(program, "uPipeBounds1");
-    pipeBounds2             = makeUniformIfPresent(program, "uPipeBounds2");
-    pipeBounds3             = makeUniformIfPresent(program, "uPipeBounds3");
-    pipeBounds4             = makeUniformIfPresent(program, "uPipeBounds4");
-    pipeJointCountA         = makeUniformIfPresent(program, "uPipeJointCountA");
-    pipeJointCountE         = makeUniformIfPresent(program, "uPipeJointCountE");
     mazePos                 = makeUniformIfPresent(program, "uMazePos");
     mazeHeading             = makeUniformIfPresent(program, "uMazeHeading");
+    spectrum                = makeUniformIfPresent(program, "uSpectrum");
+    stereoScope             = makeUniformIfPresent(program, "uStereoScope");
+    stereoWidth             = makeUniformIfPresent(program, "uStereoWidth");
+    correlation             = makeUniformIfPresent(program, "uCorrelation");
 }
 
 VisualizerRenderer::BlitUniforms::BlitUniforms(juce::OpenGLShaderProgram& program)
@@ -664,6 +658,22 @@ void VisualizerRenderer::newOpenGLContextCreated()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, AudioAnalyzer::waveformSize, 1, 0, GL_RED, GL_FLOAT, nullptr);
 
+    glGenTextures(1, &spectrumTexture);
+    glBindTexture(GL_TEXTURE_2D, spectrumTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, AudioAnalyzer::numSpectrumBars, 1, 0, GL_RED, GL_FLOAT, nullptr);
+
+    glGenTextures(1, &stereoScopeTexture);
+    glBindTexture(GL_TEXTURE_2D, stereoScopeTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, AudioAnalyzer::stereoScopeSize, 1, 0, GL_RG, GL_FLOAT, nullptr);
+
     // Perturbation reference orbit textures, one per fractal slot: one
     // texel per iteration, RGBA32F = (re.hi, re.lo, im.hi, im.lo). Nearest
     // filtering + texelFetch on the GPU side, since these are indexed
@@ -692,18 +702,6 @@ void VisualizerRenderer::newOpenGLContextCreated()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-    // Pipes joint-position texture: one texel per joint, RGBA32F =
-    // (x, y, z, radius). Nearest + texelFetch, same reasoning as the
-    // fractal reference-orbit textures -- indexed exactly by integer
-    // joint, never sampled/interpolated.
-    glGenTextures(1, &pipeJointTexture);
-    glBindTexture(GL_TEXTURE_2D, pipeJointTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, PipeNetwork::textureWidth, 1, 0, GL_RGBA, GL_FLOAT,
-                 pipeNetwork.jointData().data());
     // A fresh GL context has no texture data regardless of what was
     // uploaded before (e.g. the host tore down and recreated the context);
     // if a picture was already loaded, force the next frame to re-upload
@@ -750,16 +748,22 @@ void VisualizerRenderer::openGLContextClosing()
         waveformTexture = 0;
     }
 
+    if (spectrumTexture != 0)
+    {
+        glDeleteTextures(1, &spectrumTexture);
+        spectrumTexture = 0;
+    }
+
+    if (stereoScopeTexture != 0)
+    {
+        glDeleteTextures(1, &stereoScopeTexture);
+        stereoScopeTexture = 0;
+    }
+
     if (userImageTexture != 0)
     {
         glDeleteTextures(1, &userImageTexture);
         userImageTexture = 0;
-    }
-
-    if (pipeJointTexture != 0)
-    {
-        glDeleteTextures(1, &pipeJointTexture);
-        pipeJointTexture = 0;
     }
 
     for (auto& slot : fractalSlots)
@@ -848,18 +852,7 @@ void VisualizerRenderer::updateNavigators(float dt)
         uploadOrbitTextureIfDirty(slot.nav, slot.texture);
     }
 
-    // Pipes' growth speed: Zoom Speed and Camera Shake repurposed as
-    // "how fast things build" (Pipes has no zoom of its own), same
-    // audio-reactive shape as `rate` above but expressed directly as grid
-    // steps/second rather than a per-second shrink multiplier.
-    const double pipeGrowthRate = 3.2 + 5.5 * t
-                                 + (double) (analyzer.getBassAutoGain() * 2.0f + onsetEnvelope * 2.6f)
-                                       * (double) cameraShakeValue;
-    pipeNetwork.update((double) dt, pipeGrowthRate, navigatorRng);
-    uploadPipeTextureIfDirty();
-
-    // Maze walk speed/turn-bias: same repurposing idea as Pipes' growth
-    // rate above -- Zoom Speed becomes "how fast the walk moves", Camera
+    // Maze walk speed/turn-bias: Zoom Speed becomes "how fast the walk moves", Camera
     // Shake plus the audio envelope becomes "how eager it is to turn at
     // a junction instead of continuing straight".
     // mazeWalker moves in its own logical units (1 per hop); the shader
@@ -917,13 +910,25 @@ void VisualizerRenderer::updateWaveformTexture()
                      waveformSnapshot.data());
 }
 
-void VisualizerRenderer::uploadPipeTextureIfDirty()
+void VisualizerRenderer::updateSpectrumTexture()
 {
-    if (! pipeNetwork.consumeDirty())
-        return;
-    glBindTexture(GL_TEXTURE_2D, pipeJointTexture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, PipeNetwork::textureWidth, 1, GL_RGBA, GL_FLOAT,
-                    pipeNetwork.jointData().data());
+    analyzer.copySpectrum(spectrumSnapshot);
+    glBindTexture(GL_TEXTURE_2D, spectrumTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, AudioAnalyzer::numSpectrumBars, 1, GL_RED, GL_FLOAT,
+                     spectrumSnapshot.data());
+}
+
+void VisualizerRenderer::updateStereoScopeTexture()
+{
+    analyzer.copyStereoScope(scopeLeftSnapshot, scopeRightSnapshot);
+    for (int i = 0; i < AudioAnalyzer::stereoScopeSize; ++i)
+    {
+        scopeInterleaved[(size_t) i * 2]     = scopeLeftSnapshot[(size_t) i];
+        scopeInterleaved[(size_t) i * 2 + 1] = scopeRightSnapshot[(size_t) i];
+    }
+    glBindTexture(GL_TEXTURE_2D, stereoScopeTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, AudioAnalyzer::stereoScopeSize, 1, GL_RG, GL_FLOAT,
+                     scopeInterleaved.data());
 }
 
 void VisualizerRenderer::setSourceImage(const juce::Image& image)
@@ -1140,20 +1145,15 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     setU(u.userImageLoaded, userImageLoaded ? 1.0f : 0.0f);
 
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, pipeJointTexture);
-    setU(u.pipeJoints, (GLint) 4);
-    const auto& hues = pipeNetwork.hues();
-    setU(u.pipeHuesA, hues[0], hues[1], hues[2], hues[3]);
-    setU(u.pipeHueE, hues[4]);
-    const auto& pipeBounds = pipeNetwork.bounds();
-    setU(u.pipeBounds0, pipeBounds[0][0], pipeBounds[0][1], pipeBounds[0][2], pipeBounds[0][3]);
-    setU(u.pipeBounds1, pipeBounds[1][0], pipeBounds[1][1], pipeBounds[1][2], pipeBounds[1][3]);
-    setU(u.pipeBounds2, pipeBounds[2][0], pipeBounds[2][1], pipeBounds[2][2], pipeBounds[2][3]);
-    setU(u.pipeBounds3, pipeBounds[3][0], pipeBounds[3][1], pipeBounds[3][2], pipeBounds[3][3]);
-    setU(u.pipeBounds4, pipeBounds[4][0], pipeBounds[4][1], pipeBounds[4][2], pipeBounds[4][3]);
-    const auto& pipeJointCounts = pipeNetwork.jointCounts();
-    setU(u.pipeJointCountA, pipeJointCounts[0], pipeJointCounts[1], pipeJointCounts[2], pipeJointCounts[3]);
-    setU(u.pipeJointCountE, pipeJointCounts[4]);
+    glBindTexture(GL_TEXTURE_2D, spectrumTexture);
+    setU(u.spectrum, (GLint) 4);
+
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, stereoScopeTexture);
+    setU(u.stereoScope, (GLint) 5);
+
+    setU(u.stereoWidth, analyzer.getStereoWidth());
+    setU(u.correlation, analyzer.getCorrelation());
 
     setU(u.mazePos, mazeWalker.posX(), mazeWalker.posZ());
     setU(u.mazeHeading, mazeWalker.headingX(), mazeWalker.headingZ());
@@ -1209,6 +1209,8 @@ void VisualizerRenderer::renderOpenGL()
     onsetEnvelope = std::max(onsetEnvelope * decay, onsetPulse);
 
     updateWaveformTexture();
+    updateSpectrumTexture();
+    updateStereoScopeTexture();
     uploadUserImageIfDirty(dt);
     updateNavigators(dt);
 

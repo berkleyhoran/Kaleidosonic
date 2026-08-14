@@ -106,16 +106,16 @@ float mazeDE(vec3 p)
 
             int px = mazeFloorMod(cx, 2);
             int pz = mazeFloorMod(cz, 2);
-            vec3 half;
+            vec3 wallHalf; // not `half` -- reserved GLSL word, see common.glsl's imageContainUV comment
             if (px == 1 && pz == 1)
-                half = vec3(kWallHalfThickness, kWallHeight * 0.5, kWallHalfThickness); // corner pillar
+                wallHalf = vec3(kWallHalfThickness, kWallHeight * 0.5, kWallHalfThickness); // corner pillar
             else if (px == 1)
-                half = vec3(kWallHalfThickness, kWallHeight * 0.5, halfSpan); // blocks +/-x travel
+                wallHalf = vec3(kWallHalfThickness, kWallHeight * 0.5, halfSpan); // blocks +/-x travel
             else
-                half = vec3(halfSpan, kWallHeight * 0.5, kWallHalfThickness); // blocks +/-z travel
+                wallHalf = vec3(halfSpan, kWallHeight * 0.5, kWallHalfThickness); // blocks +/-z travel
 
             vec3 center = vec3((float(cx) + 0.5) * kPitch, kWallHeight * 0.5, (float(cz) + 0.5) * kPitch);
-            d = min(d, sdBox(p - center, half));
+            d = min(d, sdBox(p - center, wallHalf));
         }
     }
     d = min(d, p.y);               // floor plane, y = 0

@@ -580,7 +580,19 @@ void VisualizerRenderer::attachTo(juce::Component& component)
 {
     attachedComponent = &component;
     context.setOpenGLVersionRequired(juce::OpenGLContext::OpenGLVersion::openGL3_2);
-    context.setMultisamplingEnabled(true);
+    // Multisampling off: a multisampled pixel format request can fail (or
+    // silently downgrade to something the GL context can't actually use)
+    // when the window being attached to is itself embedded in a host's
+    // own compositor rather than a plain top-level window -- reported
+    // symptom is exactly this: the JUCE Component chrome (Preset combo,
+    // sliders, buttons) paints fine since that's normal software
+    // compositing, but the OpenGL-rendered visual area is solid black,
+    // with nothing at all reaching the shader-compile-error log, meaning
+    // the context likely never finishes attaching in the first place.
+    // Standalone was never affected (its window is always a plain
+    // top-level one), which is why this went uncaught until it was
+    // actually tested inside a DAW.
+    context.setMultisamplingEnabled(false);
     context.setRenderer(this);
     context.setContinuousRepainting(true);
     context.attachTo(component);
@@ -594,6 +606,18 @@ void VisualizerRenderer::detach()
 
 void VisualizerRenderer::newOpenGLContextCreated()
 {
+    // Always logged, not just on failure: this is the one line that
+    // proves the GL context actually attached at all inside whatever
+    // window it's embedded in -- its total absence from the log is what
+    // diagnosed the black-in-a-DAW-host report that led to the
+    // setMultisamplingEnabled(false) change above (attachTo()'s comment
+    // has the full story). If a render is ever reported black again with
+    // this line present in the log, the context DID attach and the bug
+    // is somewhere else (shader compile, framebuffer sizing, etc.).
+    juce::Logger::writeToLog("VisualizerRenderer: GL context created, renderer = "
+                              + juce::String((const char*) glGetString(GL_RENDERER))
+                              + ", version = " + juce::String((const char*) glGetString(GL_VERSION)));
+
     const auto vertexSrc = PresetManager::getVertexSource();
 
     blitProgram = std::make_unique<juce::OpenGLShaderProgram>(context);

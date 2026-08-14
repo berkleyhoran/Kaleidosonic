@@ -468,8 +468,19 @@ vec3 fractalLayer(vec2 uv, int variant, float radiusMultiplier, float hueShift)
 // how the plugin window's aspect ratio compares to the image's.
 vec2 imageContainUV(vec2 screenUV, float imageAspect)
 {
-    vec2 half = imageAspect > 1.0 ? vec2(imageAspect, 1.0) : vec2(1.0, 1.0 / imageAspect);
-    return screenUV / half + 0.5;
+    // Not named `half` -- that's a GLSL *reserved* word (kept aside for a
+    // future extension, alongside `fixed`/`hvec2`/etc.), not merely a
+    // used one. Most compiler front-ends silently tolerate it as an
+    // ordinary identifier, but this is exactly the kind of latent bug
+    // that stays invisible for a long time and then hard-fails the
+    // moment a stricter driver/GL-context path compiles it -- which is
+    // precisely what happened here: every single preset failing to
+    // compile, identically, at this one shared line, the moment a
+    // different context-negotiation path (a plugin host embedding the
+    // GL surface differently than a plain top-level window, in this
+    // case) exercised a compiler that actually enforces the reservation.
+    vec2 halfSize = imageAspect > 1.0 ? vec2(imageAspect, 1.0) : vec2(1.0, 1.0 / imageAspect);
+    return screenUV / halfSize + 0.5;
 }
 
 // Samples the user image at 0..1 UV, returning transparent black outside

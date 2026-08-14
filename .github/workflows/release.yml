@@ -20,16 +20,26 @@ jobs:
   # script into a single KaleidosonicSetup-style installer.
   # ---------------------------------------------------------------------
   build-windows:
-    # Pinned rather than windows-latest: CMake's "Visual Studio 17 2022"
-    # generator does a name-based search for an actual VS2022 install,
-    # and windows-latest can silently drift to a newer runner image
-    # before that search (or the image's toolset) catches up -- exactly
-    # what happened here ("could not find any instance of Visual
-    # Studio" on an image that should have had it). windows-2022 is the
-    # image GitHub actually documents as carrying VS2022.
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
+
+      # CMake's "Visual Studio 17 2022" generator does its own VS-install
+      # discovery and it failed on this runner twice ("could not find any
+      # instance of Visual Studio") even after pinning windows-2022 --
+      # confirmed locally that vcvarsall.bat's own discovery can be
+      # equally fragile (it depends on finding vswhere.exe, which isn't
+      # reliably on PATH either). ilammy/msvc-dev-cmd is the standard,
+      # well-tested way around this class of problem: it locates the
+      # toolchain itself and exports the resulting PATH/INCLUDE/LIB into
+      # $GITHUB_ENV/$GITHUB_PATH so every later step just has cl.exe on
+      # PATH already, no generator-side discovery needed at all -- then
+      # Ninja (preinstalled on this runner) builds directly against it.
+      # Verified locally that this combination produces the exact same
+      # Kaleidosonic_artefacts/Release/... output layout the Visual
+      # Studio generator did, so nothing downstream (Inno Setup's
+      # BuildDir, the rename step) needed to change.
+      - uses: ilammy/msvc-dev-cmd@v1
 
       - name: Determine version
         id: version
@@ -42,13 +52,13 @@ jobs:
           fi
 
       - name: Configure
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64 "-DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}"
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Build VST3
-        run: cmake --build build --config Release --target Kaleidosonic_VST3
+        run: cmake --build build --target Kaleidosonic_VST3
 
       - name: Build Standalone
-        run: cmake --build build --config Release --target Kaleidosonic_Standalone
+        run: cmake --build build --target Kaleidosonic_Standalone
 
       - name: Build installer
         # Inno Setup 6 ships preinstalled on the windows-latest runner

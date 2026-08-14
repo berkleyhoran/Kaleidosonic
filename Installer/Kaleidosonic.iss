@@ -6,7 +6,12 @@
 ; Standalone app with a Start Menu shortcut.
 
 #define AppName "Kaleidosonic"
-#define AppVersion "0.1.0"
+; Overridable via `ISCC.exe /DAppVersion=0.2.0 Kaleidosonic.iss` -- CI
+; passes the git tag's version through this way instead of editing the
+; file. Local/manual builds (no /D flag) just get this default.
+#ifndef AppVersion
+  #define AppVersion "0.1.0"
+#endif
 #define BuildDir "..\build\Kaleidosonic_artefacts\Release"
 
 [Setup]

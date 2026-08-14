@@ -326,6 +326,46 @@ standalone app at
 `.vst3` there yourself once, or point your DAW's plugin scan at
 `build/Kaleidosonic_artefacts/Release/VST3/` as a custom search path.
 
+**macOS / Linux:** the CMake build itself is cross-platform (same
+`FetchContent`-based JUCE setup); macOS additionally builds an **AU**
+target (`Kaleidosonic_AU`) alongside VST3/Standalone, since most Mac DAWs
+(Logic Pro in particular) expect it. Linux needs the usual JUCE system
+dependencies (ALSA, X11, FreeType, etc.) installed first -- see the
+`apt-get install` list in
+[.github/workflows/release.yml](.github/workflows/release.yml) for the
+exact package set used in CI, which is the most current reference for
+what's actually needed.
+
+```bash
+cmake -B build -G Xcode                 # macOS
+cmake -B build -DCMAKE_BUILD_TYPE=Release  # Linux
+cmake --build build --config Release --target Kaleidosonic_VST3
+cmake --build build --config Release --target Kaleidosonic_Standalone
+```
+
+**Cross-platform CI + releases:** pushing a version tag (`v0.2.0`, etc.)
+triggers [.github/workflows/release.yml](.github/workflows/release.yml),
+which builds all three platforms and publishes a GitHub Release with
+every installer attached, named:
+
+```
+Kaleidosonic-<version>-windows.exe
+Kaleidosonic-<version>-macos.zip
+Kaleidosonic-<version>-linux-x64.tar.gz
+```
+
+(That naming is deliberately stable -- anything reading the GitHub
+Releases API to build a downloads page can rely on it.) The version
+number flows from the tag into both the plugin binary and the installer
+via `-DKALEIDOSONIC_VERSION=...` / Inno Setup's `/DAppVersion=...`
+overrides -- no version numbers need editing by hand before tagging a
+release. "Run workflow" from the Actions tab (workflow_dispatch) builds
+all three platforms the same way without publishing anything, for
+testing the pipeline itself. macOS/Windows builds are currently
+**unsigned** (no Apple notarization or Windows code-signing cert yet),
+so Gatekeeper/SmartScreen will show an "unknown developer" warning on
+first launch -- expected for now, not a broken build.
+
 ## Parameters
 
 | Parameter | Range | What it does |

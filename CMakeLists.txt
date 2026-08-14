@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Kaleidosonic VERSION 0.1.0)
+# Overridable from the command line (`-DKALEIDOSONIC_VERSION=0.2.0`) so CI
+# can drive the plugin/installer version straight from a git tag without
+# editing this file -- see .github/workflows/release.yml. Local/manual
+# builds that don't pass it just get this default.
+set(KALEIDOSONIC_VERSION "0.1.0" CACHE STRING "Kaleidosonic version (plugin + installers)")
+
+project(Kaleidosonic VERSION ${KALEIDOSONIC_VERSION})
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,12 +46,20 @@ if(EXISTS ${KALEIDOSONIC_LOGO})
     set(KALEIDOSONIC_ICON_ARGS ICON_BIG "${KALEIDOSONIC_LOGO}" ICON_SMALL "${KALEIDOSONIC_LOGO}")
 endif()
 
+# AU only makes sense (and only builds) on Apple -- most Mac DAWs (Logic
+# Pro in particular) expect it over VST3, so it's worth the extra format
+# on that platform specifically rather than everywhere.
+set(KALEIDOSONIC_FORMATS VST3 Standalone)
+if(APPLE)
+    list(APPEND KALEIDOSONIC_FORMATS AU)
+endif()
+
 juce_add_plugin(Kaleidosonic
     ${KALEIDOSONIC_ICON_ARGS}
     COMPANY_NAME "Kaleidosonic"
     PLUGIN_MANUFACTURER_CODE Klds
     PLUGIN_CODE Kal1
-    FORMATS VST3 Standalone
+    FORMATS ${KALEIDOSONIC_FORMATS}
     PRODUCT_NAME "Kaleidosonic"
     VST3_CATEGORIES "Fx" "Analyzer"
     IS_SYNTH FALSE

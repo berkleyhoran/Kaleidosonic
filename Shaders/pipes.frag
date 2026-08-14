@@ -26,16 +26,51 @@ float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
     return length(pa - ba * h) - r;
 }
 
+vec4 pipeBoundsAt(int pi)
+{
+    return pi == 0 ? uPipeBounds0
+         : pi == 1 ? uPipeBounds1
+         : pi == 2 ? uPipeBounds2
+         : pi == 3 ? uPipeBounds3
+                    : uPipeBounds4;
+}
+
+int pipeJointCountAt(int pi)
+{
+    return int(pi == 0 ? uPipeJointCountA.x
+             : pi == 1 ? uPipeJointCountA.y
+             : pi == 2 ? uPipeJointCountA.z
+             : pi == 3 ? uPipeJointCountA.w
+                        : uPipeJointCountE);
+}
+
 // Nearest distance to any pipe segment, plus which pipe it belongs to
-// (for coloring) via pipeIndex (out).
+// (for coloring) via pipeIndex (out). Two real optimizations over "check
+// every joint of every pipe every step" (which is what made this preset
+// laggy -- up to 27,500 capsule evaluations per pixel per frame):
+//   1. A pipe's whole segment chain is skipped with a single
+//      distance-to-bounding-sphere check whenever that sphere is already
+//      farther away than the closest surface found so far -- safe
+//      because the sphere is built to fully contain every real segment,
+//      so distance-to-sphere is always <= the true distance to the pipe.
+//   2. The inner loop stops at that pipe's real joint count instead of
+//      always walking to kMaxJointsPerPipe, so a pipe early in its growth
+//      (a handful of real joints) doesn't pay for dozens of zero-length
+//      "padding" capsules every step.
 float pipesDE(vec3 p, out int pipeIndex)
 {
     float best = 1.0e5;
     pipeIndex = 0;
     for (int pi = 0; pi < kNumPipes; ++pi)
     {
+        vec4 b = pipeBoundsAt(pi);
+        float boundDist = length(p - b.xyz) - b.w;
+        if (boundDist >= best)
+            continue;
+
+        int count = pipeJointCountAt(pi);
         vec4 prevJoint = pipeJointAt(pi * kMaxJointsPerPipe);
-        for (int j = 1; j < kMaxJointsPerPipe; ++j)
+        for (int j = 1; j < count; ++j)
         {
             vec4 joint = pipeJointAt(pi * kMaxJointsPerPipe + j);
             float d = sdCapsule(p, prevJoint.xyz, joint.xyz, joint.w);
@@ -121,6 +156,17 @@ void main()
         vec3 base = palette(paletteT, uHue) * (0.45 + 0.65 * diff);
         col = base * (0.75 + uLevel * react * 1.0);
         col += pow(diff, 12.0) * 0.6; // metallic highlight, like the original's chrome look
+
+        // A glowing pulse of energy flowing down each pipe from its start
+        // joint -- straight-line distance rather than true along-the-pipe
+        // arc length (which would need walking the joint chain again),
+        // but at the speeds/frequencies here it reads as flow, not a cheat.
+        // Onsets kick a fresh pulse loose; mid drives its speed.
+        vec3 pipeStart = pipeJointAt(hitPipe * kMaxJointsPerPipe).xyz;
+        float travelDist = length(p - pipeStart);
+        float pulsePhase = travelDist * 1.4 - uTime * (2.2 + uMid * react * 3.0);
+        float pulse = pow(max(sin(pulsePhase), 0.0), 4.0);
+        col += pulse * palette(paletteT + 0.2, uHue) * (0.5 + uOnset * react * uCameraShake * 1.2);
     }
 
     col += glow * palette(t * 0.02 + uTime * 0.01, uHue) * (0.5 + react * 0.9);

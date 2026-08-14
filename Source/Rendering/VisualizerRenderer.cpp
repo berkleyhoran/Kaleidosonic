@@ -485,6 +485,13 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     pipeJoints              = makeUniformIfPresent(program, "uPipeJoints");
     pipeHuesA               = makeUniformIfPresent(program, "uPipeHuesA");
     pipeHueE                = makeUniformIfPresent(program, "uPipeHueE");
+    pipeBounds0             = makeUniformIfPresent(program, "uPipeBounds0");
+    pipeBounds1             = makeUniformIfPresent(program, "uPipeBounds1");
+    pipeBounds2             = makeUniformIfPresent(program, "uPipeBounds2");
+    pipeBounds3             = makeUniformIfPresent(program, "uPipeBounds3");
+    pipeBounds4             = makeUniformIfPresent(program, "uPipeBounds4");
+    pipeJointCountA         = makeUniformIfPresent(program, "uPipeJointCountA");
+    pipeJointCountE         = makeUniformIfPresent(program, "uPipeJointCountE");
     mazePos                 = makeUniformIfPresent(program, "uMazePos");
     mazeHeading             = makeUniformIfPresent(program, "uMazeHeading");
 }
@@ -1138,6 +1145,15 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     const auto& hues = pipeNetwork.hues();
     setU(u.pipeHuesA, hues[0], hues[1], hues[2], hues[3]);
     setU(u.pipeHueE, hues[4]);
+    const auto& pipeBounds = pipeNetwork.bounds();
+    setU(u.pipeBounds0, pipeBounds[0][0], pipeBounds[0][1], pipeBounds[0][2], pipeBounds[0][3]);
+    setU(u.pipeBounds1, pipeBounds[1][0], pipeBounds[1][1], pipeBounds[1][2], pipeBounds[1][3]);
+    setU(u.pipeBounds2, pipeBounds[2][0], pipeBounds[2][1], pipeBounds[2][2], pipeBounds[2][3]);
+    setU(u.pipeBounds3, pipeBounds[3][0], pipeBounds[3][1], pipeBounds[3][2], pipeBounds[3][3]);
+    setU(u.pipeBounds4, pipeBounds[4][0], pipeBounds[4][1], pipeBounds[4][2], pipeBounds[4][3]);
+    const auto& pipeJointCounts = pipeNetwork.jointCounts();
+    setU(u.pipeJointCountA, pipeJointCounts[0], pipeJointCounts[1], pipeJointCounts[2], pipeJointCounts[3]);
+    setU(u.pipeJointCountE, pipeJointCounts[4]);
 
     setU(u.mazePos, mazeWalker.posX(), mazeWalker.posZ());
     setU(u.mazeHeading, mazeWalker.headingX(), mazeWalker.headingZ());

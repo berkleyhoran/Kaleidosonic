@@ -49,6 +49,26 @@ public:
     // Per-pipe hue offset (0..1), for the shader's palette() call.
     const std::array<float, numPipes>& hues() const noexcept { return pipeHues; }
 
+    // Per-pipe bounding sphere (xyz = center, w = radius, both padded by
+    // the capsule radius) over that pipe's *actual* grown joints -- not
+    // the whole [-bound,bound]^3 arena. Lets the shader's raymarch DE
+    // skip a pipe's entire joint chain with one distance check when a
+    // ray point is nowhere near it, instead of always walking all 55
+    // segments of all 5 pipes on every single step (the actual cost
+    // behind Pipes' reported lag -- up to 27,500 capsule evaluations per
+    // pixel per frame, unconditionally).
+    const std::array<std::array<float, 4>, numPipes>& bounds() const noexcept { return pipeBounds; }
+
+    // How many joints of each pipe's `maxJointsPerPipe`-sized texture row
+    // are actually real (including the growing tip) rather than padding
+    // repeats of the last real position. The shader stops its inner loop
+    // here instead of always scanning to maxJointsPerPipe -- a pipe with
+    // 3 real joints no longer pays for 53 zero-length capsule checks
+    // every step. Float-typed (not int) purely so it uploads through the
+    // same vec4-uniform pattern as hues()/bounds() -- see
+    // VisualizerRenderer's uPipeJointCountA/E.
+    const std::array<float, numPipes>& jointCounts() const noexcept { return pipeJointCounts; }
+
     // True exactly once after growth actually changed the joint data;
     // clears itself on read.
     bool consumeDirty() noexcept
@@ -76,6 +96,8 @@ private:
 
     std::array<Pipe, numPipes> pipes;
     std::array<float, numPipes> pipeHues {};
+    std::array<std::array<float, 4>, numPipes> pipeBounds {};
+    std::array<float, numPipes> pipeJointCounts {};
     std::vector<float> jointFloats;
     bool dirty = false;
 };

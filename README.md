@@ -104,7 +104,15 @@ Audio passes through completely unmodified — this is a pure visualizer.
     color. The joint chain is raymarched as a run of capsules; the
     leading segment interpolates smoothly toward its next joint every
     frame (not just once fully grown) so the pipes visibly extrude rather
-    than popping into place in discrete unit-length jumps.
+    than popping into place in discrete unit-length jumps. A glowing
+    pulse of energy travels down each pipe from its start joint, onsets
+    kicking a fresh one loose. The raymarch skips a pipe's entire segment
+    chain with one bounding-sphere check whenever it's nowhere near the
+    ray, and stops each pipe's inner loop at however many joints are
+    actually real instead of always walking to the per-pipe budget --
+    the fix for this preset being reported as laggy, which traced to
+    always evaluating up to 27,500 capsule distances per pixel per frame
+    regardless of how much was actually visible.
   - **Infinite Maze** — a Wolfenstein-style autonomous walk through a
     procedurally-hashed pillar maze that never repeats and needs no
     storage at all: every cell's wall/open state is a pure function of

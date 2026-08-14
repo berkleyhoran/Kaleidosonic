@@ -100,6 +100,19 @@ uniform float uUserImageLoaded;
 uniform sampler2D uPipeJoints;
 uniform vec4 uPipeHuesA;
 uniform float uPipeHueE;
+// Per-pipe bounding sphere (xyz center, w radius) over that pipe's actual
+// grown joints, and how many of its maxJointsPerPipe texture-row slots
+// are real vs. padding -- lets the raymarch skip a whole pipe's segment
+// chain with one distance check instead of always walking all of it. See
+// PipeNetwork::bounds()/jointCounts() for the full reasoning (this is
+// what actually fixed Pipes' reported lag).
+uniform vec4 uPipeBounds0;
+uniform vec4 uPipeBounds1;
+uniform vec4 uPipeBounds2;
+uniform vec4 uPipeBounds3;
+uniform vec4 uPipeBounds4;
+uniform vec4 uPipeJointCountA;
+uniform float uPipeJointCountE;
 
 // "Infinite Maze" preset camera state (see Source/Rendering/MazeWalker.h):
 // world-space (x, z) position and normalized (x, z) facing direction. No

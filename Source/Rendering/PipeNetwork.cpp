@@ -152,6 +152,16 @@ void PipeNetwork::rebuildBuffer()
         }
         const std::array<float, 3>& pad = hasTip ? tip : lastConfirmed;
 
+        // Real joints (including the growing tip, excluding padding) --
+        // the shader stops scanning here instead of always walking to
+        // maxJointsPerPipe. At least 2 so there's always at least one
+        // (possibly zero-length, i.e. a single ball) capsule to draw --
+        // a fresh pipe's single start point shouldn't just vanish.
+        const int activeCount = std::clamp(confirmed + (hasTip ? 1 : 0), 2, maxJointsPerPipe);
+
+        float minX = 1.0e9f, minY = 1.0e9f, minZ = 1.0e9f;
+        float maxX = -1.0e9f, maxY = -1.0e9f, maxZ = -1.0e9f;
+
         for (int j = 0; j < maxJointsPerPipe; ++j)
         {
             std::array<float, 3> pos;
@@ -162,6 +172,13 @@ void PipeNetwork::rebuildBuffer()
             else
                 pos = pad;
 
+            if (j < activeCount)
+            {
+                minX = std::min(minX, pos[0]); maxX = std::max(maxX, pos[0]);
+                minY = std::min(minY, pos[1]); maxY = std::max(maxY, pos[1]);
+                minZ = std::min(minZ, pos[2]); maxZ = std::max(maxZ, pos[2]);
+            }
+
             const size_t idx = (size_t) (p * maxJointsPerPipe + j) * 4;
             jointFloats[idx + 0] = pos[0];
             jointFloats[idx + 1] = pos[1];
@@ -169,6 +186,17 @@ void PipeNetwork::rebuildBuffer()
             jointFloats[idx + 3] = radius;
         }
         pipeHues[(size_t) p] = pipe.hue;
+        pipeJointCounts[(size_t) p] = (float) activeCount;
+
+        const float cx = (minX + maxX) * 0.5f, cy = (minY + maxY) * 0.5f, cz = (minZ + maxZ) * 0.5f;
+        const float dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
+        // Half-diagonal of the active joints' bounding box, plus the
+        // capsule radius and a small margin -- a sphere that's guaranteed
+        // to fully contain every real segment, so distance-to-this-sphere
+        // is always a safe (never too large) lower bound on distance to
+        // the pipe's actual geometry.
+        const float boundRadius = 0.5f * std::sqrt(dx * dx + dy * dy + dz * dz) + radius + 0.05f;
+        pipeBounds[(size_t) p] = { cx, cy, cz, boundRadius };
     }
 
     dirty = true;

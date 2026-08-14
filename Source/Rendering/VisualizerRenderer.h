@@ -74,7 +74,8 @@ private:
             feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
             fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
             ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded, pipeJoints,
-            pipeHuesA, pipeHueE, mazePos, mazeHeading;
+            pipeHuesA, pipeHueE, pipeBounds0, pipeBounds1, pipeBounds2, pipeBounds3, pipeBounds4,
+            pipeJointCountA, pipeJointCountE, mazePos, mazeHeading;
     };
 
     struct CompiledPreset

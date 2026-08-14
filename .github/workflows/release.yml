@@ -20,7 +20,14 @@ jobs:
   # script into a single KaleidosonicSetup-style installer.
   # ---------------------------------------------------------------------
   build-windows:
-    runs-on: windows-latest
+    # Pinned rather than windows-latest: CMake's "Visual Studio 17 2022"
+    # generator does a name-based search for an actual VS2022 install,
+    # and windows-latest can silently drift to a newer runner image
+    # before that search (or the image's toolset) catches up -- exactly
+    # what happened here ("could not find any instance of Visual
+    # Studio" on an image that should have had it). windows-2022 is the
+    # image GitHub actually documents as carrying VS2022.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
 

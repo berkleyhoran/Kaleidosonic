@@ -183,5 +183,20 @@ private:
     juce::Label imageStatusLabel;
     std::unique_ptr<juce::FileChooser> imageFileChooser;
 
+#if JUCE_WINDOWS
+    // See SystemAudioLoopback.h -- lets the Standalone app visualize
+    // whatever the system's speakers are currently playing without a
+    // virtual audio cable. Only made visible when
+    // processorRef.wrapperType is actually wrapperType_Standalone (a
+    // *runtime* check -- see the big comment on
+    // KaleidosonicAudioProcessor::setSystemAudioCaptureEnabled for why a
+    // compile-time `#if JucePlugin_Build_Standalone` doesn't reliably
+    // differ per format in this project's build setup), so it's absent
+    // from a VST3 instance, which already gets its host track's audio
+    // directly.
+    juce::ToggleButton systemAudioToggle { "Capture System Audio (no virtual cable needed)" };
+    bool showSystemAudioToggle = false;
+#endif
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KaleidosonicAudioProcessorEditor)
 };

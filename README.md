@@ -214,6 +214,18 @@ Audio passes through completely unmodified — this is a pure visualizer.
   onto a luminance gradient between two picked colors (a duotone effect)
   via the Primary/Secondary Color swatches in the panel. All six are
   0/off by default and layer on top of *any* preset.
+- **Capture System Audio** (Standalone app, Windows only): a checkbox that
+  visualizes whatever your speakers are currently playing — another app,
+  a browser tab, anything — with no virtual audio cable (VB-Cable,
+  VoiceMeeter, etc.) needed. Implemented as real **WASAPI loopback
+  capture** directly against the Win32 COM APIs
+  (`Source/SystemAudioLoopback.h/.cpp`): JUCE's own WASAPI backend only
+  exposes shared/exclusive/sharedLowLatency modes, no loopback, so this
+  opens the system's default output device with
+  `AUDCLNT_STREAMFLAGS_LOOPBACK` on a dedicated thread and feeds the
+  captured audio straight into `AudioAnalyzer`, bypassing the normal
+  device-input path while it's on. Doesn't apply to (or appear in) the
+  VST3 — a plugin instance already gets its host track's audio directly.
 - **Two-layer compositing**: Layer A (the main Preset dropdown) and an
   independently-chosen **Layer B** blend together via **Layer Mix**
   (0 = just Layer A) through a **Blend Mode** — Crossfade, Add, Screen,
@@ -277,6 +289,8 @@ Source/
   PluginProcessor.*         Audio passthrough + wiring
   PluginEditor.*            GUI: OpenGL visual background + control panel + explorer input
   AudioAnalyzer.*           FFT band energy + onset detection (audio thread)
+  SystemAudioLoopback.*     Standalone-only, Windows-only WASAPI loopback capture
+                              ("Capture System Audio" -- see Features above)
   VisualizerParameters.*    APVTS parameter layout (the automation surface)
   Presets/PresetManager.*   Maps preset index -> GLSL source (BinaryData)
   Rendering/VisualizerRenderer.*  OpenGL context, FBOs, per-frame uniforms, fractal slots,

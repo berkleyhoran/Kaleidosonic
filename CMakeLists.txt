@@ -75,6 +75,7 @@ target_sources(Kaleidosonic PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/AudioAnalyzer.cpp
+    Source/SystemAudioLoopback.cpp
     Source/VisualizerParameters.cpp
     Source/Presets/PresetManager.cpp
     Source/Rendering/VisualizerRenderer.cpp

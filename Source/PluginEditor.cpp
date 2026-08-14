@@ -87,6 +87,24 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     imageStatusLabel.setText("No image loaded", juce::dontSendNotification);
     controlsContent.addAndMakeVisible(imageStatusLabel);
 
+#if JUCE_WINDOWS
+    showSystemAudioToggle = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
+    if (showSystemAudioToggle)
+    {
+        systemAudioToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
+        systemAudioToggle.setToggleState(processorRef.isSystemAudioCaptureEnabled(), juce::dontSendNotification);
+        systemAudioToggle.onClick = [this]
+        {
+            processorRef.setSystemAudioCaptureEnabled(systemAudioToggle.getToggleState());
+            // The processor can refuse (no default output device, etc.) --
+            // reflect what actually happened rather than just what was
+            // clicked, so a failed attempt visibly snaps back off.
+            systemAudioToggle.setToggleState(processorRef.isSystemAudioCaptureEnabled(), juce::dontSendNotification);
+        };
+        controlsContent.addAndMakeVisible(systemAudioToggle);
+    }
+#endif
+
     // Reconnect a picture chosen in an earlier session (the path survives
     // in the plugin's saved state -- see PluginProcessor::getImagePath).
     // setSourceImage() is safe to call before the GL context exists; the
@@ -426,12 +444,19 @@ void KaleidosonicAudioProcessorEditor::resized()
     constexpr int presetRowHeight = 46;
     constexpr int imageRowHeight = 46;
     constexpr int colorRowHeight = 46;
+#if JUCE_WINDOWS
+    constexpr int systemAudioRowHeight = 28;
+#endif
 
     // First pass: total content height, so the Viewport's scrollbar is
     // sized correctly before we position anything.
     // margin + Layer A/B combos + Blend Mode + always-visible Layer Mix +
     // Load Image row + color swatches row
     int totalHeight = 16 + presetRowHeight * 3 + rowHeight + imageRowHeight + colorRowHeight;
+#if JUCE_WINDOWS
+    if (showSystemAudioToggle)
+        totalHeight += systemAudioRowHeight;
+#endif
     for (auto* groupUI : paramGroupUIs)
         totalHeight += headerHeight + (groupUI->header.expanded ? rowHeight * groupUI->sliders.size() : 0);
 
@@ -457,6 +482,11 @@ void KaleidosonicAudioProcessorEditor::resized()
     auto imageRow = content.removeFromTop(imageRowHeight);
     loadImageButton.setBounds(imageRow.removeFromTop(24));
     imageStatusLabel.setBounds(imageRow);
+
+#if JUCE_WINDOWS
+    if (showSystemAudioToggle)
+        systemAudioToggle.setBounds(content.removeFromTop(systemAudioRowHeight));
+#endif
 
     auto colorRow = content.removeFromTop(colorRowHeight);
     auto leftColor = colorRow.removeFromLeft(colorRow.getWidth() / 2).reduced(4, 0);

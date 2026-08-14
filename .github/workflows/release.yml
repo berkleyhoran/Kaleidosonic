@@ -31,11 +31,11 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 "-DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Build VST3
         run: cmake --build build --config Release --target Kaleidosonic_VST3
@@ -78,11 +78,11 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure
-        run: cmake -B build -G Xcode -DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}
+        run: cmake -B build -G Xcode "-DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Build VST3
         run: cmake --build build --config Release --target Kaleidosonic_VST3
@@ -126,7 +126,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install JUCE Linux dependencies
@@ -142,7 +142,7 @@ jobs:
             libglu1-mesa-dev mesa-common-dev
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release "-DKALEIDOSONIC_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Build VST3
         run: cmake --build build --config Release --target Kaleidosonic_VST3 -- -j$(nproc)

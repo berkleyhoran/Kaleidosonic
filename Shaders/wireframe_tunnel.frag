@@ -1,11 +1,10 @@
 // Wireframe Tunnel — a classic demoscene vector-tunnel flythrough: neon
 // hoops stacked down the Z axis, connected by longitudinal rails, both
 // genuinely thin (radius ~0.02) rather than solid walls -- so between the
-// wires there's void, not a lit surface. That's the whole visual
-// difference from Raymarch Tunnel 3D's solid boxed corridor: here almost
-// every ray *grazes* a wire instead of hitting one dead-on, so the image
-// is built mostly from the glow accumulator's halo rather than direct
-// hit-shading -- exactly the soft neon-line look a wireframe tunnel needs.
+// wires there's void, not a lit surface. Almost every ray *grazes* a wire
+// instead of hitting one dead-on, so the image is built mostly from the
+// glow accumulator's halo rather than direct hit-shading -- exactly the
+// soft neon-line look a wireframe tunnel needs.
 // Both hoops and rails are torus/capsule primitives, genuine distance
 // estimators with no discontinuities, so this is safe to sphere-trace at
 // any step size without the overshoot risk a discontinuous field would

@@ -91,8 +91,14 @@ const std::vector<ParamGroupInfo>& paramGroups()
                               ParamIDs::cameraScale, ParamIDs::zoomWander } },
         { "Fractal Detail", { ParamIDs::iterations, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion,
                                ParamIDs::feedbackAmount } },
+        // colorOverride is deliberately NOT listed here -- it lives as its
+        // own always-visible slider directly under the Primary/Secondary
+        // Color swatches in the editor (same treatment as Layer Mix under
+        // the Layer B combo), since that's where it conceptually belongs
+        // and it's the one slider that actually enables what those
+        // swatches do.
         { "Color", { ParamIDs::hue, ParamIDs::saturation, ParamIDs::brightness, ParamIDs::contrast,
-                      ParamIDs::palette, ParamIDs::colorOverride } },
+                      ParamIDs::palette } },
         { "Post FX: Trails & Flame", { ParamIDs::trails, ParamIDs::trailDirection, ParamIDs::flame } },
         { "Post FX: Filters", { ParamIDs::blur, ParamIDs::noiseAmount, ParamIDs::datamosh, ParamIDs::shine,
                                  ParamIDs::gummy, ParamIDs::posterize, ParamIDs::fisheye,
@@ -128,101 +134,94 @@ namespace
             /* 2  Plasma Feedback */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
               ParamIDs::rotationSpeed, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::feedbackAmount },
-            /* 3  IFS Tunnel */
-            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
-              ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion,
-              ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 4  Tunnel Spiral */
+            /* 3  Tunnel Spiral */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake,
               ParamIDs::cameraScale },
-            /* 5  Burning Ship */
+            /* 4  Burning Ship */
             { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
               ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 6  Apollonian Gasket */
+            /* 5  Apollonian Gasket */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
               ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion, ParamIDs::zoomWander,
               ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 7  Raymarch Tunnel 3D */
-            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
-              ParamIDs::rotationSpeed, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 8  Particle Bloom */
+            /* 6  Particle Bloom */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::kaleidoscopeSegments, ParamIDs::cameraScale },
-            /* 9  Oscilloscope Glow */
+            /* 7  Oscilloscope Glow */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::kaleidoscopeSegments, ParamIDs::distortion },
-            /* 10 Waveform Scope */
+            /* 8  Waveform Scope */
             { ParamIDs::trebleGain },
-            /* 11 Sierpinski Triforce */
+            /* 9  Sierpinski Triforce */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 12 Fractal Bubbles */
+            /* 10 Fractal Bubbles */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 13 Starfield Warp */
+            /* 11 Starfield Warp */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::zoomWander, ParamIDs::cameraShake,
               ParamIDs::cameraScale },
-            /* 14 Mandelbox */
+            /* 12 Mandelbox */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 15 Mandelbrot Explorer */
+            /* 13 Mandelbrot Explorer */
             { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
-            /* 16 Burning Ship Explorer */
+            /* 14 Burning Ship Explorer */
             { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
-            /* 17 Perpendicular Ship */
+            /* 15 Perpendicular Ship */
             { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
-            /* 18 Buffalo Fractal */
+            /* 16 Buffalo Fractal */
             { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
-            /* 19 Tricorn */
+            /* 17 Tricorn */
             { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
-            /* 20 Burning Ship 3D */
+            /* 18 Burning Ship 3D */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 21 Audio Nebula */
+            /* 19 Audio Nebula */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 22 Image Ripple */
+            /* 20 Image Ripple */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 23 Image Shatter */
+            /* 21 Image Shatter */
             { ParamIDs::bassGain, ParamIDs::distortion, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 24 Image Kaleidoscope */
+            /* 22 Image Kaleidoscope */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
               ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 25 Shape Rave */
+            /* 23 Shape Rave */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 26 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
+            /* 24 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 27 Rotating Light Logo */
+            /* 25 Rotating Light Logo */
             { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 28 Wireframe Tunnel */
+            /* 26 Wireframe Tunnel */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 29 Metaballs */
+            /* 27 Metaballs */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 30 Crystal Cave */
+            /* 28 Crystal Cave */
             { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 31 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
+            /* 29 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
             { ParamIDs::palette },
-            /* 32 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
+            /* 30 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
                also reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
             { ParamIDs::rotationSpeed, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 33 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
+            /* 31 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
             { ParamIDs::cameraScale, ParamIDs::palette },
-            /* 34 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
+            /* 32 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 35 Neon Logo -- Distortion controls traced line thickness */
+            /* 33 Neon Logo -- Distortion controls traced line thickness */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 36 Logo Hologram -- Distortion controls chromatic split amount */
+            /* 34 Logo Hologram -- Distortion controls chromatic split amount */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
               ParamIDs::palette },
         };

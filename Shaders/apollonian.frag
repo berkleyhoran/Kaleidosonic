@@ -42,7 +42,7 @@ void main()
     uv *= uIfsZoomScale.x;
 
     // Center drift and inversion scale are driven by Camera Shake, not
-    // Reactivity -- see IFS Tunnel's comment for why. The scale animation
+    // Reactivity -- see Plasma Feedback's comment for why. The scale animation
     // combines two incommensurate frequencies so it never visibly repeats.
     vec2 center = 0.18 * uZoomWander * vec2(sin(uTime * 0.17 + uBass * uCameraShake * 1.8), cos(uTime * 0.13));
     float scale = 1.6 + 0.5 * sin(uTime * 0.045) + 0.3 * sin(uTime * 0.071 + 1.7) + uTreble * uCameraShake * 0.4;

@@ -14,7 +14,7 @@ void main()
     float react = uReactivity;
 
     // Warp speed is driven by Camera Shake, not Reactivity -- see
-    // IFS Tunnel's comment for why.
+    // Plasma Feedback's comment for why.
     float speed = (0.3 + 1.5 * max(uZoomSpeed, 0.0)) * (1.0 + uBass * uCameraShake * 2.5 + uOnset * uCameraShake * 2.0);
     float t = uTime * speed;
 

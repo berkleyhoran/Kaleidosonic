@@ -79,6 +79,8 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     { pushColourToParams(c, ParamIDs::secondaryColorR, ParamIDs::secondaryColorG, ParamIDs::secondaryColorB); };
     controlsContent.addAndMakeVisible(secondaryColorSwatch);
 
+    colorOverrideSlider.reset(addParamSlider(controlsContent, ParamIDs::colorOverride, "Color Override"));
+
     loadImageButton.onClick = [this] { openImageChooser(); };
     controlsContent.addAndMakeVisible(loadImageButton);
     imageStatusLabel.setJustificationType(juce::Justification::left);
@@ -451,8 +453,8 @@ void KaleidosonicAudioProcessorEditor::resized()
     // First pass: total content height, so the Viewport's scrollbar is
     // sized correctly before we position anything.
     // margin + Layer A/B combos + Blend Mode + always-visible Layer Mix +
-    // Load Image row + color swatches row
-    int totalHeight = 16 + presetRowHeight * 3 + rowHeight + imageRowHeight + colorRowHeight;
+    // Load Image row + color swatches row + Color Override row
+    int totalHeight = 16 + presetRowHeight * 3 + rowHeight + imageRowHeight + colorRowHeight + rowHeight;
 #if JUCE_WINDOWS
     if (showSystemAudioToggle)
         totalHeight += systemAudioRowHeight;
@@ -495,6 +497,10 @@ void KaleidosonicAudioProcessorEditor::resized()
     primaryColorSwatch.setBounds(leftColor);
     secondaryColorLabel.setBounds(rightColor.removeFromTop(18));
     secondaryColorSwatch.setBounds(rightColor);
+
+    auto colorOverrideRow = content.removeFromTop(rowHeight);
+    colorOverrideSlider->label.setBounds(colorOverrideRow.removeFromTop(18));
+    colorOverrideSlider->slider.setBounds(colorOverrideRow);
 
     // Full-bleed section headers read as dividers cutting edge-to-edge
     // across the panel, so they're positioned in the un-reduced content

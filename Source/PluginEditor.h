@@ -170,12 +170,14 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> blendModeAttachment;
     std::unique_ptr<ParamSlider> layerMixSlider;
 
-    // Primary/Secondary color swatches -- also always visible/ungrouped;
-    // the Color Override amount slider that actually enables their effect
-    // lives in the generic Color group (paramGroups()) instead, since it's
-    // a normal 0..1 automatable float like Shine/Gummy/etc.
+    // Primary/Secondary color swatches -- also always visible/ungrouped,
+    // with the Color Override amount slider that actually enables their
+    // effect sitting directly underneath (moved out of the generic Color
+    // group it used to live in, since that buried the one control that
+    // makes these swatches do anything).
     ColorSwatch primaryColorSwatch, secondaryColorSwatch;
     juce::Label primaryColorLabel, secondaryColorLabel;
+    std::unique_ptr<ParamSlider> colorOverrideSlider;
 
     juce::OwnedArray<ParamGroupUI> paramGroupUIs;
 

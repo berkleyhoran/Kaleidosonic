@@ -20,7 +20,10 @@ void main()
 
     // Sample the previous frame through a zoom/rotate transform so the
     // feedback loop spirals rather than just fading in place. Driven by
-    // Camera Shake, not Reactivity -- see IFS Tunnel's comment for why.
+    // Camera Shake, not Reactivity -- coupling actual motion speed to the
+    // same knob as color/brightness reactivity made high-Reactivity
+    // settings feel like motion sickness. (Other presets with the same
+    // Camera-Shake-not-Reactivity motion split point back here.)
     float fbZoom = 1.0 - (0.012 + 0.02 * uZoomSpeed + uBass * uCameraShake * 0.06);
     float fbRot = 0.01 * uRotationSpeed + uOnset * uCameraShake * 0.06;
     vec2 fbUv = rotate2d(fbRot) * (uv * fbZoom);

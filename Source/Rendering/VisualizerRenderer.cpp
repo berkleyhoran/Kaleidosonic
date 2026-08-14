@@ -536,20 +536,34 @@ VisualizerRenderer::PostUniforms::PostUniforms(juce::OpenGLShaderProgram& progra
 VisualizerRenderer::VisualizerRenderer(AudioAnalyzer& analyzerToUse, VisualizerParameterRefs& paramsToUse)
     : analyzer(analyzerToUse), params(paramsToUse)
 {
-    // Preset indices must match PresetNames::all in VisualizerParameters.h.
+    // Looked up by name rather than hardcoded index: this used to be raw
+    // integer literals ("preset indices must match PresetNames::all"),
+    // which is exactly the kind of thing that silently breaks the moment
+    // a preset earlier in the list is ever added or removed -- every slot
+    // below would quietly start driving the wrong preset instead of
+    // failing loudly. indexOf() makes this self-correcting regardless of
+    // future list edits.
+    //
     // Two autopilot dive presets (boundary-bisection locked -- see
     // FractalNavigator.h) and five manually-navigated explorers. The
     // ship-family explorers pass panYSign -1 because their shaders flip the
     // imaginary axis into the classic orientation.
     using Mode = FractalNavigator::Mode;
     fractalSlots.reserve(7);
-    fractalSlots.emplace_back(0, FractalFormula::Mandelbrot, Mode::Autopilot, -0.745, 0.11, 1.4);
-    fractalSlots.emplace_back(5, FractalFormula::BurningShip, Mode::Autopilot, -1.75, -0.03, 1.4);
-    fractalSlots.emplace_back(15, FractalFormula::Mandelbrot, Mode::Manual, -0.6, 0.0, 2.6);
-    fractalSlots.emplace_back(16, FractalFormula::BurningShip, Mode::Manual, -0.45, -0.5, 2.4, -1.0);
-    fractalSlots.emplace_back(17, FractalFormula::PerpendicularShip, Mode::Manual, -0.45, -0.4, 2.4, -1.0);
-    fractalSlots.emplace_back(18, FractalFormula::Buffalo, Mode::Manual, -0.6, -0.35, 2.6, -1.0);
-    fractalSlots.emplace_back(19, FractalFormula::Tricorn, Mode::Manual, -0.25, 0.0, 2.8);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Mandelbrot Pulse"), FractalFormula::Mandelbrot,
+                               Mode::Autopilot, -0.745, 0.11, 1.4);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Burning Ship"), FractalFormula::BurningShip,
+                               Mode::Autopilot, -1.75, -0.03, 1.4);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Mandelbrot Explorer"), FractalFormula::Mandelbrot,
+                               Mode::Manual, -0.6, 0.0, 2.6);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Burning Ship Explorer"), FractalFormula::BurningShip,
+                               Mode::Manual, -0.45, -0.5, 2.4, -1.0);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Perpendicular Ship"), FractalFormula::PerpendicularShip,
+                               Mode::Manual, -0.45, -0.4, 2.4, -1.0);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Buffalo Fractal"), FractalFormula::Buffalo,
+                               Mode::Manual, -0.6, -0.35, 2.6, -1.0);
+    fractalSlots.emplace_back(PresetNames::all.indexOf("Tricorn"), FractalFormula::Tricorn,
+                               Mode::Manual, -0.25, 0.0, 2.8);
 }
 
 void VisualizerRenderer::requestManualZoom(float steps)

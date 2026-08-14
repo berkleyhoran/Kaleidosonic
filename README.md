@@ -11,7 +11,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **37 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **35 GLSL presets**, switchable and cross-fadable while the DAW automates
   them:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
@@ -52,10 +52,10 @@ Audio passes through completely unmodified — this is a pure visualizer.
     precision. Crisp antialiased triangle edges, level-continuous colors.
   - **Apollonian Gasket** — repeated circle-inversion folding, the classic
     "infinite nested circles" fractal.
-  - **Plasma Feedback**, **IFS Tunnel**, **Tunnel Spiral**,
-    **Raymarch Tunnel 3D**, **Particle Bloom**, **Oscilloscope Glow**,
-    **Waveform Scope**, **Fractal Bubbles**, **Starfield Warp** — feedback,
-    tunnel, particle, and scope-style presets.
+  - **Plasma Feedback**, **Tunnel Spiral**, **Particle Bloom**,
+    **Oscilloscope Glow**, **Waveform Scope**, **Fractal Bubbles**,
+    **Starfield Warp** — feedback, tunnel, particle, and scope-style
+    presets.
   - **Audio Nebula** — domain-warped FBM noise clouds (the "iq warping"
     technique: the noise field warps its own sampling coordinates, twice),
     which turns flat noise into real billowing smoke. Bass drives the warp
@@ -124,11 +124,15 @@ Audio passes through completely unmodified — this is a pure visualizer.
     since this is one flat-plane intersection per pixel rather than a
     loop, raising the density cost nothing and fixed the disc reading as
     an indistinct pile of circles instead of the actual logo.
-  - **Neon Logo** — the loaded picture/logo redrawn as a glowing neon-tube
-    outline: a cheap 4-tap luminance-gradient edge trace, colored, and
-    left for the existing Bloom Intensity post-FX to actually bloom, with
-    a real neon-tube flicker (mostly steady, occasional hashed dips,
-    harder flicker forced on every onset).
+  - **Neon Logo** — the loaded picture/logo mounted on a flat card that
+    spins around its own vertical (Y) axis in true 3D (a genuine ray-plane
+    intersection, same closed-form-not-raymarched approach as Rotating
+    Light Logo), dimming toward the rim as it turns edge-on. The outline
+    itself is a cheap 4-tap luminance-gradient edge trace, colored, left
+    for the existing Bloom Intensity post-FX to actually bloom, with a
+    real neon-tube flicker (mostly steady, occasional hashed dips, harder
+    flicker forced on every onset) plus a thin neon frame at the card's
+    own edge so it reads as a discrete spinning object.
   - **Logo Hologram** — the loaded picture/logo as a cyan-tinted
     holographic projection: fine scanlines, RGB channel splitting
     (chromatic aberration), and a bright scan band that sweeps down and
@@ -311,10 +315,9 @@ Shaders/
   mandelbrot_explorer.frag    burning_ship_explorer.frag
   perpendicular_ship.frag     buffalo.frag             tricorn.frag
   burning_ship_3d.frag        mandelbox.frag           sierpinski_triforce.frag
-  apollonian.frag             plasma_feedback.frag     ifs_tunnel.frag
-  tunnel_spiral.frag          raymarch_tunnel.frag     particle_bloom.frag
-  oscilloscope.frag           waveform_scope.frag      fractal_bubbles.frag
-  starfield_warp.frag         audio_nebula.frag
+  apollonian.frag             plasma_feedback.frag     tunnel_spiral.frag
+  particle_bloom.frag         oscilloscope.frag        waveform_scope.frag
+  fractal_bubbles.frag         starfield_warp.frag      audio_nebula.frag
   image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
   shape_rave.frag              infinite_maze.frag       light_logo.frag
   wireframe_tunnel.frag         metaballs.frag           crystal_cave.frag
@@ -406,8 +409,8 @@ first launch -- expected for now, not a broken build.
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (37) | Selects Layer A, the main active shader preset |
-| Layer B | choice (37) | The second, independently-chosen preset Layer Mix blends in |
+| Preset | choice (35) | Selects Layer A, the main active shader preset |
+| Layer B | choice (35) | The second, independently-chosen preset Layer Mix blends in |
 | Blend Mode | choice (6) | How Layer B combines with Layer A: Crossfade, Add, Screen, Multiply, Difference, Lighten |
 | Layer Mix | 0–1 | How much of Layer B (combined via Blend Mode) shows over Layer A |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |

@@ -12,7 +12,7 @@ void main()
     float angle = atan(uv.y, uv.x);
 
     // Spiral speed is driven by Camera Shake, not Reactivity -- see
-    // IFS Tunnel's comment for why.
+    // Plasma Feedback's comment for why.
     float spiralSpeed = uTime * (0.4 + 1.2 * uZoomSpeed) + uBass * uCameraShake * 9.0 + uOnset * uCameraShake * 4.0;
     float spiral = angle * (2.0 + uDistortion * 6.0) + 1.0 / radius - spiralSpeed;
 

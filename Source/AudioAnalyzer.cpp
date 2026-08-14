@@ -158,20 +158,6 @@ void AudioAnalyzer::runFFTOnFifo()
     int bassCount = 0, midCount = 0, trebCount = 0;
     float flux = 0.0f;
 
-    // Log-spaced spectrum bar buckets, same magnitude data as bass/mid/
-    // treble above just cut finer -- log spacing so low-frequency bars
-    // (where music actually has most of its perceptible detail) get a fair
-    // share of the numSpectrumBars slots instead of being crushed into 1-2
-    // bars the way a linear split would.
-    constexpr float spectrumLoHz = 40.0f;
-    const float spectrumHiHz = std::min((float) (sampleRate * 0.5), 16000.0f);
-    const float logLo = std::log2(spectrumLoHz);
-    const float logHi = std::log2(spectrumHiHz);
-    std::array<float, (size_t) numSpectrumBars> barSums {};
-    std::array<int, (size_t) numSpectrumBars> barCounts {};
-    barSums.fill(0.0f);
-    barCounts.fill(0);
-
     for (int bin = 1; bin < numBins; ++bin)
     {
         const float magnitude = fftData[(size_t) bin];
@@ -183,21 +169,37 @@ void AudioAnalyzer::runFFTOnFifo()
         if (freq >= bassLoHz && freq < bassHiHz)      { bassSum += magnitude; ++bassCount; }
         else if (freq >= midLoHz && freq < midHiHz)   { midSum += magnitude; ++midCount; }
         else if (freq >= trebLoHz && freq < trebHiHz) { trebSum += magnitude; ++trebCount; }
-
-        if (freq >= spectrumLoHz && freq <= spectrumHiHz)
-        {
-            const float t = (std::log2(freq) - logLo) / (logHi - logLo);
-            const int barIndex = juce::jlimit(0, numSpectrumBars - 1, (int) (t * (float) numSpectrumBars));
-            barSums[(size_t) barIndex] += magnitude;
-            ++barCounts[(size_t) barIndex];
-        }
     }
+
+    // Log-spaced spectrum bars, same magnitude data as bass/mid/treble
+    // above just cut finer -- log spacing so low-frequency bars (where
+    // music actually has most of its perceptible detail) get a fair share
+    // of the numSpectrumBars slots instead of being crushed into 1-2 bars
+    // the way a linear split would. Each bar's value is *interpolated*
+    // directly from the two nearest FFT bins at that bar's own center
+    // frequency, NOT averaged from whichever bins happen to fall in its
+    // range -- the FFT's bins are linearly spaced (~43Hz apart at this hop
+    // size) while the bars are log-spaced, so in the bass region a bar's
+    // frequency range can be narrower than the gap between bins, leaving
+    // it with zero bins averaged in (a permanently-silent bar) under the
+    // old bucket-averaging approach. Interpolating instead guarantees
+    // every bar reads a real, smooth value regardless of how coarse the
+    // bin grid is relative to the bar width.
+    constexpr float spectrumLoHz = 40.0f;
+    const float spectrumHiHz = std::min((float) (sampleRate * 0.5), 16000.0f);
+    const float logLo = std::log2(spectrumLoHz);
+    const float logHi = std::log2(spectrumHiHz);
 
     for (int bar = 0; bar < numSpectrumBars; ++bar)
     {
-        const float barTarget = squash(barCounts[(size_t) bar] > 0
-                                            ? barSums[(size_t) bar] / (float) barCounts[(size_t) bar]
-                                            : 0.0f);
+        const float t = (float (bar) + 0.5f) / float (numSpectrumBars);
+        const float freq = std::pow(2.0f, logLo + t * (logHi - logLo));
+        const float binPos = juce::jlimit(1.0f, (float) (numBins - 2), freq / binHz);
+        const int binLo = (int) binPos;
+        const float frac = binPos - (float) binLo;
+        const float magnitude = fftData[(size_t) binLo] * (1.0f - frac) + fftData[(size_t) (binLo + 1)] * frac;
+
+        const float barTarget = squash(magnitude);
         const float prevSmoothed = spectrumSmoothed[(size_t) bar];
         const float smoothedBar = onePole(prevSmoothed, barTarget, barTarget > prevSmoothed ? 0.5f : 0.15f);
         spectrumSmoothed[(size_t) bar] = smoothedBar;

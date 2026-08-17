@@ -1,11 +1,14 @@
-; Inno Setup script for Kaleidosonic -- dark-themed wizard.
+; Inno Setup script for Reactex (product name; the underlying CMake
+; target/build artifacts are still named Kaleidosonic -- see BuildDir
+; below, an internal detail this script's own front-facing strings don't
+; need to track) -- dark-themed wizard.
 ; Build with: ISCC.exe Installer\Kaleidosonic.iss   (after a Release build)
 ; Produces Installer\Output\KaleidosonicSetup.exe -- a single installer
 ; anyone can run: it puts the VST3 where every DAW looks for it
 ; (C:\Program Files\Common Files\VST3) and optionally installs the
 ; Standalone app with a Start Menu shortcut.
 
-#define AppName "Kaleidosonic"
+#define AppName "Reactex"
 ; Overridable via `ISCC.exe /DAppVersion=0.2.0 Kaleidosonic.iss` -- CI
 ; passes the git tag's version through this way instead of editing the
 ; file. Local/manual builds (no /D flag) just get this default.
@@ -18,7 +21,7 @@
 AppId={{7E1B7C52-9C1A-4B7E-9D8A-3F2A61C04D19}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=Gexex
+AppPublisher=gexex
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputBaseFilename=KaleidosonicSetup
@@ -46,17 +49,20 @@ Name: "standalone"; Description: "Standalone app"; Types: full custom
 
 [Files]
 ; The .vst3 is a bundle folder -- copy it whole into the system VST3 dir.
-Source: "{#BuildDir}\VST3\Kaleidosonic.vst3\*"; DestDir: "{commoncf64}\VST3\Kaleidosonic.vst3"; \
+; Filenames here are "Reactex.*" because that's PRODUCT_NAME in
+; CMakeLists.txt, which is what JUCE actually names the built artifacts --
+; not a manual rename, this has to match the real build output.
+Source: "{#BuildDir}\VST3\Reactex.vst3\*"; DestDir: "{commoncf64}\VST3\Reactex.vst3"; \
     Components: vst3; Flags: recursesubdirs ignoreversion
-Source: "{#BuildDir}\Standalone\Kaleidosonic.exe"; DestDir: "{app}"; \
+Source: "{#BuildDir}\Standalone\Reactex.exe"; DestDir: "{app}"; \
     Components: standalone; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\Kaleidosonic.exe"; Components: standalone
+Name: "{group}\{#AppName}"; Filename: "{app}\Reactex.exe"; Components: standalone
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "{app}\Kaleidosonic.exe"; Description: "Launch {#AppName}"; \
+Filename: "{app}\Reactex.exe"; Description: "Launch {#AppName}"; \
     Components: standalone; Flags: nowait postinstall skipifsilent
 
 [Messages]

@@ -1,4 +1,4 @@
-# Kaleidosonic
+# Reactex
 
 An audio-reactive, fully DAW-automatable VST3 visualizer plugin. Load it on
 any channel and it renders GPU-shader fractals and kaleidoscopic feedback
@@ -6,6 +6,15 @@ tunnels that pulse, zoom, and morph with the audio passing through it. Every
 visual parameter is exposed as a normal VST3 parameter, so you can draw
 automation curves for it in your DAW exactly like you would for a filter
 cutoff or a reverb mix.
+
+> Front-facing name only: the DAW plugin list, Standalone window, and
+> installer all say "Reactex" (`PRODUCT_NAME` in `CMakeLists.txt`). The
+> GitHub repo, the CMake build target/artifact folder, C++ class names, and
+> the log file are still "Kaleidosonic" underneath — a deliberate,
+> internal-only split (see the `PRODUCT_NAME` comment in `CMakeLists.txt`
+> for why a rename here is safe: the VST3's actual identity, the part a DAW
+> uses to recognize existing project files, comes from
+> `PLUGIN_MANUFACTURER_CODE`/`PLUGIN_CODE`, neither of which changed).
 
 Audio passes through completely unmodified — this is a pure visualizer.
 
@@ -356,9 +365,11 @@ cmake --build build --config Release
 ```
 
 The VST3 lands at
-`build/Kaleidosonic_artefacts/Release/VST3/Kaleidosonic.vst3` and the
+`build/Kaleidosonic_artefacts/Release/VST3/Reactex.vst3` and the
 standalone app at
-`build/Kaleidosonic_artefacts/Release/Standalone/Kaleidosonic.exe`.
+`build/Kaleidosonic_artefacts/Release/Standalone/Reactex.exe` (the artifact
+*folder* is still named after the CMake target, "Kaleidosonic" -- only the
+actual .vst3/.exe filenames follow `PRODUCT_NAME`, "Reactex").
 
 `COPY_PLUGIN_AFTER_BUILD` is off (copying into
 `C:\Program Files\Common Files\VST3\` needs admin rights). Either copy the

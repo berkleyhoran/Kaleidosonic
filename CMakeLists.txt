@@ -56,7 +56,7 @@ endif()
 
 juce_add_plugin(Kaleidosonic
     ${KALEIDOSONIC_ICON_ARGS}
-    COMPANY_NAME "Gexex"
+    COMPANY_NAME "gexex"
     # Pinned explicitly rather than left to JUCE's default
     # com.<CompanyName>.<ProductName> derivation, so a future publisher-
     # name change (like this one, from the placeholder "Kaleidosonic") can
@@ -65,7 +65,15 @@ juce_add_plugin(Kaleidosonic
     PLUGIN_MANUFACTURER_CODE Klds
     PLUGIN_CODE Kal1
     FORMATS ${KALEIDOSONIC_FORMATS}
-    PRODUCT_NAME "Kaleidosonic"
+    # The front-facing product name -- what shows in a DAW's plugin list,
+    # the Standalone window title, and the built artifact filenames
+    # (Reactex.vst3/.exe/.component). Everything internal (the CMake
+    # target itself, C++ class names, the build artifact folder, the log
+    # file) is still "Kaleidosonic" on purpose -- see PLUGIN_MANUFACTURER_CODE
+    # /PLUGIN_CODE below for why that's fine (those two 4-char codes, not
+    # this name, are what a VST3 host actually uses to identify the
+    # plugin across renames).
+    PRODUCT_NAME "Reactex"
     VST3_CATEGORIES "Fx" "Analyzer"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE

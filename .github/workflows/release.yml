@@ -117,9 +117,13 @@ jobs:
           STAGE="Kaleidosonic-macos"
           BUILD_DIR="build/Kaleidosonic_artefacts/Release"
           mkdir -p "$STAGE"
-          cp -R "$BUILD_DIR/VST3/Kaleidosonic.vst3" "$STAGE/"
-          cp -R "$BUILD_DIR/AU/Kaleidosonic.component" "$STAGE/"
-          cp -R "$BUILD_DIR/Standalone/Kaleidosonic.app" "$STAGE/"
+          # Filenames here are "Reactex.*" -- that's PRODUCT_NAME in
+          # CMakeLists.txt, i.e. the real build output, not a manual
+          # rename. The release asset name below stays "Kaleidosonic-"
+          # on purpose (the downloads page depends on that pattern).
+          cp -R "$BUILD_DIR/VST3/Reactex.vst3" "$STAGE/"
+          cp -R "$BUILD_DIR/AU/Reactex.component" "$STAGE/"
+          cp -R "$BUILD_DIR/Standalone/Reactex.app" "$STAGE/"
           ditto -c -k --sequesterRsrc --keepParent "$STAGE" "Kaleidosonic-$VERSION-macos.zip"
 
       - uses: actions/upload-artifact@v4
@@ -174,8 +178,10 @@ jobs:
           STAGE="Kaleidosonic-linux-x64"
           BUILD_DIR="build/Kaleidosonic_artefacts/Release"
           mkdir -p "$STAGE"
-          cp -R "$BUILD_DIR/VST3/Kaleidosonic.vst3" "$STAGE/"
-          cp "$BUILD_DIR/Standalone/Kaleidosonic" "$STAGE/"
+          # Reactex.* here is the real PRODUCT_NAME-derived build output,
+          # not a manual rename -- see the macOS job's Package step.
+          cp -R "$BUILD_DIR/VST3/Reactex.vst3" "$STAGE/"
+          cp "$BUILD_DIR/Standalone/Reactex" "$STAGE/"
           tar -czf "Kaleidosonic-$VERSION-linux-x64.tar.gz" "$STAGE"
 
       - uses: actions/upload-artifact@v4
@@ -209,5 +215,5 @@ jobs:
             artifacts/macos-installer/*.zip \
             artifacts/linux-installer/*.tar.gz \
             --repo "${{ github.repository }}" \
-            --title "Kaleidosonic ${{ github.ref_name }}" \
+            --title "Reactex ${{ github.ref_name }}" \
             --generate-notes

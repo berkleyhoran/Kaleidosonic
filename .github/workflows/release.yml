@@ -70,12 +70,12 @@ jobs:
 
       - name: Rename artifact
         shell: bash
-        run: mv "Installer/Output/KaleidosonicSetup.exe" "Kaleidosonic-${{ steps.version.outputs.version }}-windows.exe"
+        run: mv "Installer/Output/KaleidosonicSetup.exe" "Reactex-${{ steps.version.outputs.version }}-windows.exe"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: Kaleidosonic-*-windows.exe
+          path: Reactex-*-windows.exe
 
   # ---------------------------------------------------------------------
   # macOS: VST3 + AU + Standalone .app, zipped together. Unsigned/
@@ -114,22 +114,21 @@ jobs:
         run: |
           set -e
           VERSION="${{ steps.version.outputs.version }}"
-          STAGE="Kaleidosonic-macos"
+          STAGE="Reactex-macos"
           BUILD_DIR="build/Kaleidosonic_artefacts/Release"
           mkdir -p "$STAGE"
           # Filenames here are "Reactex.*" -- that's PRODUCT_NAME in
           # CMakeLists.txt, i.e. the real build output, not a manual
-          # rename. The release asset name below stays "Kaleidosonic-"
-          # on purpose (the downloads page depends on that pattern).
+          # rename.
           cp -R "$BUILD_DIR/VST3/Reactex.vst3" "$STAGE/"
           cp -R "$BUILD_DIR/AU/Reactex.component" "$STAGE/"
           cp -R "$BUILD_DIR/Standalone/Reactex.app" "$STAGE/"
-          ditto -c -k --sequesterRsrc --keepParent "$STAGE" "Kaleidosonic-$VERSION-macos.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$STAGE" "Reactex-$VERSION-macos.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos-installer
-          path: Kaleidosonic-*-macos.zip
+          path: Reactex-*-macos.zip
 
   # ---------------------------------------------------------------------
   # Linux: VST3 + Standalone binary, plain tarball (Linux plugin users
@@ -175,19 +174,19 @@ jobs:
         run: |
           set -e
           VERSION="${{ steps.version.outputs.version }}"
-          STAGE="Kaleidosonic-linux-x64"
+          STAGE="Reactex-linux-x64"
           BUILD_DIR="build/Kaleidosonic_artefacts/Release"
           mkdir -p "$STAGE"
           # Reactex.* here is the real PRODUCT_NAME-derived build output,
           # not a manual rename -- see the macOS job's Package step.
           cp -R "$BUILD_DIR/VST3/Reactex.vst3" "$STAGE/"
           cp "$BUILD_DIR/Standalone/Reactex" "$STAGE/"
-          tar -czf "Kaleidosonic-$VERSION-linux-x64.tar.gz" "$STAGE"
+          tar -czf "Reactex-$VERSION-linux-x64.tar.gz" "$STAGE"
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-installer
-          path: Kaleidosonic-*-linux-x64.tar.gz
+          path: Reactex-*-linux-x64.tar.gz
 
   # ---------------------------------------------------------------------
   # Only runs for an actual version-tag push (never workflow_dispatch --

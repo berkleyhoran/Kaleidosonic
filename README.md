@@ -7,14 +7,15 @@ visual parameter is exposed as a normal VST3 parameter, so you can draw
 automation curves for it in your DAW exactly like you would for a filter
 cutoff or a reverb mix.
 
-> Front-facing name only: the DAW plugin list, Standalone window, and
-> installer all say "Reactex" (`PRODUCT_NAME` in `CMakeLists.txt`). The
-> GitHub repo, the CMake build target/artifact folder, C++ class names, and
-> the log file are still "Kaleidosonic" underneath — a deliberate,
-> internal-only split (see the `PRODUCT_NAME` comment in `CMakeLists.txt`
-> for why a rename here is safe: the VST3's actual identity, the part a DAW
-> uses to recognize existing project files, comes from
-> `PLUGIN_MANUFACTURER_CODE`/`PLUGIN_CODE`, neither of which changed).
+> Front-facing name only: the DAW plugin list, Standalone window,
+> installer, and published release assets all say "Reactex"
+> (`PRODUCT_NAME` in `CMakeLists.txt`). The GitHub repo, the CMake build
+> target/artifact folder, C++ class names, and the log file are still
+> "Kaleidosonic" underneath — a deliberate, internal-only split (see the
+> `PRODUCT_NAME` comment in `CMakeLists.txt` for why a rename here is
+> safe: the VST3's actual identity, the part a DAW uses to recognize
+> existing project files, comes from `PLUGIN_MANUFACTURER_CODE`/
+> `PLUGIN_CODE`, neither of which changed).
 
 Audio passes through completely unmodified — this is a pure visualizer.
 
@@ -399,9 +400,9 @@ which builds all three platforms and publishes a GitHub Release with
 every installer attached, named:
 
 ```
-Kaleidosonic-<version>-windows.exe
-Kaleidosonic-<version>-macos.zip
-Kaleidosonic-<version>-linux-x64.tar.gz
+Reactex-<version>-windows.exe
+Reactex-<version>-macos.zip
+Reactex-<version>-linux-x64.tar.gz
 ```
 
 (That naming is deliberately stable -- anything reading the GitHub

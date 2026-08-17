@@ -56,7 +56,12 @@ endif()
 
 juce_add_plugin(Kaleidosonic
     ${KALEIDOSONIC_ICON_ARGS}
-    COMPANY_NAME "Kaleidosonic"
+    COMPANY_NAME "Gexex"
+    # Pinned explicitly rather than left to JUCE's default
+    # com.<CompanyName>.<ProductName> derivation, so a future publisher-
+    # name change (like this one, from the placeholder "Kaleidosonic") can
+    # never silently shift the macOS bundle ID again.
+    BUNDLE_ID "com.gexex.kaleidosonic"
     PLUGIN_MANUFACTURER_CODE Klds
     PLUGIN_CODE Kal1
     FORMATS ${KALEIDOSONIC_FORMATS}

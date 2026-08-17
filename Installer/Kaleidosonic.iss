@@ -18,7 +18,7 @@
 AppId={{7E1B7C52-9C1A-4B7E-9D8A-3F2A61C04D19}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=Kaleidosonic
+AppPublisher=Gexex
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 OutputBaseFilename=KaleidosonicSetup

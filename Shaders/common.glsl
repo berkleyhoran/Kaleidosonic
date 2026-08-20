@@ -121,6 +121,18 @@ uniform float uUserImageLoaded;
 uniform vec2 uMazePos;
 uniform vec2 uMazeHeading;
 
+// "Bouncing Shapes" preset physics state (see VisualizerRenderer::
+// updateBounceShapes) -- a real CPU-side elastic-collision simulation
+// (shape-vs-shape AND shape-vs-screen-edge), since unlike every other
+// preset's motion this genuinely can't be a pure function of uTime: two
+// shapes' collision depends on where they actually are, which depends on
+// their whole prior history of collisions. One texel per shape: R=x, G=y,
+// B=size, A=shapeType. Keep kNumBounceShapes in sync with
+// VisualizerRenderer::kNumBounceShapes by hand -- there's no way to share
+// it between C++ and GLSL directly.
+const int kNumBounceShapes = 6;
+uniform sampler2D uBounceState;
+
 vec3 hsv2rgb(vec3 c)
 {
     vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -531,6 +543,20 @@ vec3 exploreFractal(int variant, float ySign)
 {
     vec2 uv = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
     uv.y *= ySign;
+
+    // A gentle, always-on drift on top of the manual view -- Rotation
+    // Speed spins the frame slowly, Zoom Speed breathes it in and out,
+    // Distortion adds a slow fine wobble to the sample coordinate itself.
+    // Deliberately kept small (the header comment's "never moving the
+    // camera out from under the user" principle still holds for the
+    // actual pan/zoom, which stay 100% manual via FractalNavigator) --
+    // this only makes an otherwise perfectly static explorer view read as
+    // alive rather than a frozen screenshot, at an amplitude too slight to
+    // fight the mouse wheel/drag input building the real view radius/
+    // offset upstream.
+    uv = rotate2d(uTime * 0.015 * uRotationSpeed) * uv;
+    uv *= 1.0 + 0.03 * sin(uTime * 0.12 * (0.3 + abs(uZoomSpeed))) * (0.4 + abs(uZoomSpeed));
+    uv += uDistortion * 0.006 * vec2(sin(uv.y * 9.0 + uTime * 0.6), cos(uv.x * 9.0 - uTime * 0.5));
 
     vec3 col = fractalLayer(uv, variant, 1.0, 0.0);
     col *= 0.85 + uLevel * uReactivity * 0.45;

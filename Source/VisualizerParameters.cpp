@@ -36,6 +36,9 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::bassGain, "Bass Gain", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::midGain, "Mid Gain", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::trebleGain, "Treble Gain", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::eqLowGain, "EQ Low", -18.0f, 18.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::eqMidGain, "EQ Mid", -18.0f, 18.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::eqHighGain, "EQ High", -18.0f, 18.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::zoomSpeed, "Zoom Speed", -1.0f, 1.0f, 0.3f));
     params.push_back(makeFloat(ParamIDs::rotationSpeed, "Rotation Speed", -1.0f, 1.0f, 0.2f));
     params.push_back(makeFloat(ParamIDs::hue, "Hue", 0.0f, 1.0f, 0.0f));
@@ -87,6 +90,12 @@ const std::vector<ParamGroupInfo>& paramGroups()
 {
     static const std::vector<ParamGroupInfo> groups {
         { "Audio Reactivity", { ParamIDs::reactivity, ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain } },
+        // A real EQ on the signal itself, applied before FFT/band analysis
+        // (see AudioAnalyzer::setEqGains) -- distinct from the Gain sliders
+        // above, which only rescale the already-analyzed bass/mid/treble
+        // numbers. Its own group since it's a genuinely different kind of
+        // control (dB, pre-analysis) from everything else here.
+        { "Input EQ (Pre-Analysis)", { ParamIDs::eqLowGain, ParamIDs::eqMidGain, ParamIDs::eqHighGain } },
         { "Motion & Zoom", { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
                               ParamIDs::cameraScale, ParamIDs::zoomWander } },
         { "Fractal Detail", { ParamIDs::iterations, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion,
@@ -166,16 +175,25 @@ namespace
             /* 12 Mandelbox */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            // 13-17: the manual explorers all share exploreFractal() in
+            // common.glsl, which now adds a slight always-on Rotation
+            // Speed/Zoom Speed/Distortion drift on top of the manual view
+            // (see its own comment for why this doesn't fight manual nav).
             /* 13 Mandelbrot Explorer */
-            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::palette },
             /* 14 Burning Ship Explorer */
-            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::palette },
             /* 15 Perpendicular Ship */
-            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::palette },
             /* 16 Buffalo Fractal */
-            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::palette },
             /* 17 Tricorn */
-            { ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::palette },
+            { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
+              ParamIDs::cameraShake, ParamIDs::palette },
             /* 18 Burning Ship 3D */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
@@ -196,37 +214,94 @@ namespace
             /* 24 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 25 Rotating Light Logo */
-            { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
-              ParamIDs::palette },
-            /* 26 Wireframe Tunnel */
+            /* 25 Wireframe Tunnel */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 27 Metaballs */
+            /* 26 Metaballs */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 28 Crystal Cave */
+            /* 27 Crystal Cave */
             { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 29 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
+            /* 28 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
             { ParamIDs::palette },
-            /* 30 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
+            /* 29 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
                also reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
             { ParamIDs::rotationSpeed, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 31 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
+            /* 30 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
             { ParamIDs::cameraScale, ParamIDs::palette },
-            /* 32 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
+            /* 31 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 33 Neon Logo -- Distortion controls traced line thickness */
+            /* 32 Video Feedback -- Zoom Speed=Growth, Rotation Speed=Rotation,
+               Distortion=Direction, Feedback Amount=Blend (see the .frag header) */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::distortion, ParamIDs::feedbackAmount, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 33 Tri-Color Waves */
+            { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion },
+            /* 34 Wave Sphere */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 35 Image Fragments */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::distortion,
+              ParamIDs::cameraScale, ParamIDs::palette },
+            /* 36 Image Feedback Zoom */
+            { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::feedbackAmount,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 37 Ocean Floor -- Zoom Speed repurposed as current drift speed */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 38 Water Ripples */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 34 Logo Hologram -- Distortion controls chromatic split amount */
-            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
+            /* 39 Jelly Polygons */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraScale,
               ParamIDs::palette },
+            /* 40 Goopy Slime */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 41 Drippy Liquid -- fully 2D now, no rotation/camera-shake/treble reads */
+            { ParamIDs::bassGain, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 42 Bouncing Shapes -- fully 2D now, bounces off the actual screen edges and off each other */
+            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 43 2D Flames -- Zoom Speed repurposed as upward rise/flicker speed */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion,
+              ParamIDs::palette },
+            /* 44 Energy Tunnel -- Zoom Speed=travel speed, Rotation Speed=spin around the tunnel axis */
+            { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
+              ParamIDs::cameraShake, ParamIDs::palette },
         };
         return table;
     }
+}
+
+const std::vector<PresetCategory>& presetCategories()
+{
+    // Every name here must exist in PresetNames::all -- the editor looks
+    // each one up by indexOf() rather than assuming these ranges are
+    // contiguous in the flat list, so presets can be reshuffled between
+    // categories here freely without ever touching the real APVTS index
+    // any of them lives at.
+    static const std::vector<PresetCategory> categories {
+        { "Fractal Dives", { "Mandelbrot Pulse", "Julia Kaleidoscope", "Burning Ship", "Apollonian Gasket",
+                              "Sierpinski Triforce" } },
+        { "Fractal Explorers", { "Mandelbrot Explorer", "Burning Ship Explorer", "Perpendicular Ship",
+                                  "Buffalo Fractal", "Tricorn" } },
+        { "Fractal 3D", { "Burning Ship 3D", "Mandelbox", "Energy Tunnel" } },
+        { "Tunnels & Feedback", { "Tunnel Spiral", "Plasma Feedback", "Wireframe Tunnel", "Infinite Maze",
+                                   "Video Feedback" } },
+        { "Particles & Fields", { "Particle Bloom", "Starfield Warp", "Fractal Bubbles", "Audio Nebula",
+                                   "Shape Rave", "Metaballs", "Crystal Cave", "Wispy Ribbons", "2D Flames" } },
+        { "Waveforms & Analyzers", { "Oscilloscope Glow", "Waveform Scope", "Spectrum Bars", "Radial Spectrum",
+                                      "Stereo Field", "Tri-Color Waves", "Wave Sphere" } },
+        { "Image Reactive", { "Image Ripple", "Image Shatter", "Image Kaleidoscope", "Image Fragments",
+                               "Image Feedback Zoom" } },
+        { "Environments", { "Ocean Floor", "Water Ripples" } },
+        { "Organic & Physics", { "Jelly Polygons", "Goopy Slime", "Drippy Liquid", "Bouncing Shapes" } },
+    };
+    return categories;
 }
 
 bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID)
@@ -241,6 +316,11 @@ bool isParamRelevantForPreset(int presetIndex, const juce::String& paramID)
         ParamIDs::vignette, ParamIDs::chromaticAberration, ParamIDs::colorCycleSpeed, ParamIDs::pulseDepth,
         ParamIDs::posterize, ParamIDs::fisheye, ParamIDs::trailDirection, ParamIDs::flame, ParamIDs::shine,
         ParamIDs::gummy, ParamIDs::colorOverride, ParamIDs::jpegify, ParamIDs::dotMatrix,
+        // EQ reshapes the signal before analysis, upstream of every preset
+        // that reads any audio-driven uniform at all -- always relevant for
+        // the same reason Reactivity is, regardless of which specific band
+        // uniforms a given preset's shader happens to read.
+        ParamIDs::eqLowGain, ParamIDs::eqMidGain, ParamIDs::eqHighGain,
     };
     if (std::find(alwaysRelevant.begin(), alwaysRelevant.end(), paramID) != alwaysRelevant.end())
         return true;
@@ -263,6 +343,9 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     bassGain              = apvts.getRawParameterValue(ParamIDs::bassGain);
     midGain                = apvts.getRawParameterValue(ParamIDs::midGain);
     trebleGain             = apvts.getRawParameterValue(ParamIDs::trebleGain);
+    eqLowGain               = apvts.getRawParameterValue(ParamIDs::eqLowGain);
+    eqMidGain                = apvts.getRawParameterValue(ParamIDs::eqMidGain);
+    eqHighGain               = apvts.getRawParameterValue(ParamIDs::eqHighGain);
     zoomSpeed              = apvts.getRawParameterValue(ParamIDs::zoomSpeed);
     rotationSpeed          = apvts.getRawParameterValue(ParamIDs::rotationSpeed);
     hue                     = apvts.getRawParameterValue(ParamIDs::hue);

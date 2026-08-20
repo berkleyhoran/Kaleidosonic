@@ -21,8 +21,15 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **35 GLSL presets**, switchable and cross-fadable while the DAW automates
-  them:
+- **45 GLSL presets**, switchable and cross-fadable while the DAW automates
+  them, grouped into categories (Fractal Dives, Fractal Explorers, Fractal
+  3D, Tunnels & Feedback, Particles & Fields, Waveforms & Analyzers, Image
+  Reactive, Environments, Organic & Physics) in the Preset/Layer B dropdowns
+  purely for scanability — see `presetCategories()` in
+  [VisualizerParameters.cpp](Source/VisualizerParameters.cpp); the
+  underlying `Preset` choice-parameter index (what automation/saved
+  projects actually point at) is completely unaffected by category
+  membership:
   - **Mandelbrot Pulse** — kaleidoscope-folded, multi-scale deep dive into
     the Mandelbrot set. Where to zoom is decided on the CPU
     (`Source/Rendering/FractalNavigator.h/.cpp`) by **boundary bisection**:
@@ -41,7 +48,11 @@ Audio passes through completely unmodified — this is a pure visualizer.
     rendered plainly (no kaleidoscope), manually navigated: **mouse wheel
     or Up/Down arrows zoom, dragging pans**. The reference orbit re-anchors
     itself onto the best point in view as you move, so detail stays crisp
-    to ~1e11x zoom.
+    to ~1e11x zoom. A slight, always-on Rotation Speed/Zoom Speed/
+    Distortion drift layers on top of the manual view (`exploreFractal()`
+    in `common.glsl`) so it reads as alive rather than a frozen screenshot
+    — deliberately too gentle to fight the mouse wheel/drag input actually
+    driving the view.
   - **Perpendicular Ship / Buffalo Fractal / Tricorn** — three classic
     variations of the Burning Ship / Mandelbrot family
     ((Re z + i|Im z|)², the post-square-abs "buffalo", and conj(z)²),
@@ -121,32 +132,6 @@ Audio passes through completely unmodified — this is a pure visualizer.
     Corridors are rendered wide with only thin pillars/wall-slabs (not
     filling their whole grid cell) so the walk reads as roomy rather than
     scraping the walls.
-  - **Rotating Light Logo** — the loaded picture (or GIF) redrawn as a
-    disc of individually-lit points, like a light-bulb marquee sign,
-    spinning in 3D while the camera drifts around it; each point's
-    brightness comes from the image at its own grid cell and breathes on
-    its own hashed sine-wave phase, so the grid twinkles rather than
-    pulsing as one block. Deliberately an analytic ray-*plane*
-    intersection rather than a raymarched heightfield -- Shape Rave's
-    header comment explains why a discontinuous per-cell field isn't a
-    real distance estimator and would risk the same overshoot artifacts
-    that took two fixes to chase down there. The point grid is 132×132 --
-    since this is one flat-plane intersection per pixel rather than a
-    loop, raising the density cost nothing and fixed the disc reading as
-    an indistinct pile of circles instead of the actual logo.
-  - **Neon Logo** — the loaded picture/logo mounted on a flat card that
-    spins around its own vertical (Y) axis in true 3D (a genuine ray-plane
-    intersection, same closed-form-not-raymarched approach as Rotating
-    Light Logo), dimming toward the rim as it turns edge-on. The outline
-    itself is a cheap 4-tap luminance-gradient edge trace, colored, left
-    for the existing Bloom Intensity post-FX to actually bloom, with a
-    real neon-tube flicker (mostly steady, occasional hashed dips, harder
-    flicker forced on every onset) plus a thin neon frame at the card's
-    own edge so it reads as a discrete spinning object.
-  - **Logo Hologram** — the loaded picture/logo as a cyan-tinted
-    holographic projection: fine scanlines, RGB channel splitting
-    (chromatic aberration), and a bright scan band that sweeps down and
-    wraps, brightening whatever it currently passes over.
   - **Spectrum Bars** / **Radial Spectrum** — real per-band FFT magnitude
     (not the collapsed bass/mid/treble scalars every other preset reads --
     see `AudioAnalyzer::numSpectrumBars`, 48 log-spaced bars ~40Hz-16kHz)
@@ -190,6 +175,88 @@ Audio passes through completely unmodified — this is a pure visualizer.
     palette base and a strong specular glint, so it reads as cut crystal
     rather than plain colored glass; onset strobes a camera-flash across
     every facet at once.
+  - **Video Feedback** — an analog video-synth "camera pointed at its own
+    monitor" loop: each frame re-samples the previous frame through a
+    zoom/rotate/translate transform and blends fresh seed content back in,
+    so the image spirals, blooms, and drifts forever. Growth/Rotation/
+    Direction/Blend map onto Zoom Speed/Rotation Speed/Distortion/Feedback
+    Amount rather than adding new parameters — same "repurpose a generic
+    knob" convention Infinite Maze's Zoom Speed/Camera Shake already use.
+  - **Tri-Color Waves** — the same left-to-right waveform trace as
+    Waveform Scope, drawn three times in three hues with a small phase/
+    vertical offset between each pass, so it reads as three colored beams
+    weaving through each other — a "misconverged CRT" look. Distortion
+    controls how far the beams separate.
+  - **Wave Sphere** — the waveform wrapped around a raymarched sphere's own
+    surface as radial displacement (sampled by angle around the body),
+    lit with a real SDF-gradient normal, camera slowly orbiting — a
+    genuinely 3D "ball with waves on it" instead of a flat/radial 2D read.
+  - **Image Fragments** — the loaded picture broken into a grid of square
+    fragments, each one continuously drifting, spinning, and breathing in
+    scale on its own independent orbit — a "shattered photo floating in
+    zero gravity" read, distinct from Image Shatter's onset-triggered
+    spring-back shards.
+  - **Image Feedback Zoom** — the loaded picture fed through the same
+    previous-frame feedback loop Plasma/Video Feedback use, except the
+    picture itself (not procedural noise) is blended back in each
+    generation, evoking the classic Droste "picture containing a picture"
+    effect.
+  - **Ocean Floor** — a sunlit sandy sea floor viewed from above: rippled
+    sand ridges, swaying seaweed, animated caustic light nets, and god-ray
+    light shafts descending from above, all under a strong, unmistakably
+    blue depth tint. Bass swells the ripple amplitude, treble sharpens the
+    caustic sparkle. Fully procedural (no raymarch).
+  - **Water Ripples** — rain-drop-style ripples landing on still water:
+    many independent drops, each a fresh expanding damped-sine ring wave,
+    summed together so overlapping rings genuinely interfere, then used to
+    perturb a fake surface normal for a real specular glint rather than a
+    flat colored ring. Bass speeds up drop spawn rate, onset triggers an
+    extra strong ripple from center.
+  - **Jelly Polygons** — the whole screen filled with soft, squishy N-gon
+    shapes smooth-min blended into each other, each one wobbling at its
+    own edge and the whole field squashing vertically on bass. Fully 2D,
+    no raymarch.
+  - **Goopy Slime** — a single continuous mass of viscous goo: a few big
+    lobes smooth-min merged into one oozing body that bulges with the
+    bass, finished with a hard, glossy specular highlight for a wet-surface
+    read distinct from Metaballs' softer plastic finish.
+  - **Drippy Liquid** — drips hanging from an unseen ceiling, each on its
+    own independent cycle: elongating, releasing as a droplet that falls
+    under gravity-like ease, and splashing where it lands, before
+    repeating. Bass speeds up the whole cycle.
+  - **Bouncing Shapes** — circles, rounded squares, and triangles that
+    genuinely bounce off the screen's actual edges *and* off each other,
+    via a real CPU-side elastic-collision simulation
+    (`VisualizerRenderer::updateBounceShapes`) rather than a purely
+    time-based trajectory — real pairwise collision can't be a pure
+    function of time, since where two shapes collide depends on their
+    whole prior history. State (position/size/type per shape) uploads to a
+    small texture the shader reads (`uBounceState`), same pattern as the
+    spectrum/stereo-scope data. Overlapping shapes smooth-min blend
+    together with a bright contact flash right at the moment of impact.
+  - **2D Flames** — a classic upward-scrolling domain-warped-noise fire
+    (the same "iq warping" FBM technique as Audio Nebula), shaped by a
+    vertical/horizontal falloff into flame silhouettes rising off the
+    bottom of the screen, with a dedicated warm fire color ramp (dark
+    ember → orange → yellow → white-hot). Bass makes the flames roar
+    taller, onsets launch a shower of rising embers.
+  - **Energy Tunnel** — a kaleidoscopically-folded, pulsing energy-veined
+    fractal tunnel the camera flies continuously through: visionary-art
+    (Alex Grey-style) sacred-geometry mandala detail, built from the same
+    bounded box/ball-fold iteration as Mandelbox (genuinely infinite
+    detail by construction) but applied to a domain-repeated infinite
+    corridor with radial kaleidoscope symmetry folded in first, and a
+    flight tube carved out of the middle via CSG subtraction so the
+    camera always has a clear path while fractal detail radiates as walls
+    all around it.
+- **Real pre-analysis EQ** (`EQ Low`/`EQ Mid`/`EQ High`, ±18dB, in a
+  dedicated "Input EQ (Pre-Analysis)" parameter group): a genuine 3-band
+  shelf/peak filter applied to a filtered *copy* of the incoming signal
+  before FFT/band analysis ever sees it — bass/mid/treble/spectrum/
+  waveform/onset/stereo width all measure the filtered copy. Distinct from
+  the Bass/Mid/Treble Gain sliders above, which only rescale the
+  already-analyzed numbers after the fact. The signal reaching the DAW's
+  output is never touched either way — see `AudioAnalyzer::setEqGains`.
 - **Animated GIF playback**: the same "Load Image..." picker used by the
   image-reactive presets above decodes every frame of a `.gif` (via a
   vendored [stb_image](https://github.com/nothings/stb) decoder --
@@ -207,7 +274,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
   pre-downmix plus a 1024-sample L/R scope ring buffer (Stereo Field), and
   **auto-gain** normalization so reactivity tracks the *dynamics* of
   whatever's playing instead of absolute loudness.
-- **46 automatable parameters**, including a **Palette** parameter (0–8)
+- **49 automatable parameters**, including a **Palette** parameter (0–8)
   that sweeps/crossfades through curated cosine-gradient palettes
   (Spectrum, Fire, Ice, Synthwave, Sunset, Forest, Mono, Psychedelic) on
   top of the Hue knob, plus eighteen global post-FX (Trails, Blur, Noise,
@@ -329,10 +396,14 @@ Shaders/
   particle_bloom.frag         oscilloscope.frag        waveform_scope.frag
   fractal_bubbles.frag         starfield_warp.frag      audio_nebula.frag
   image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
-  shape_rave.frag              infinite_maze.frag       light_logo.frag
+  shape_rave.frag              infinite_maze.frag
   wireframe_tunnel.frag         metaballs.frag           crystal_cave.frag
   spectrum_bars.frag            radial_spectrum.frag     stereo_field.frag
-  wispy_ribbons.frag             neon_logo.frag           logo_hologram.frag
+  wispy_ribbons.frag             video_feedback.frag     tri_color_waves.frag
+  wave_sphere.frag               image_fragments.frag    image_feedback_zoom.frag
+  ocean_floor.frag                water_ripples.frag      jelly_polygons.frag
+  goopy_slime.frag                 drippy_liquid.frag      bouncing_shapes.frag
+  flames_2d.frag                    energy_tunnel.frag
 ```
 
 The renderer pipeline is two stages: Layer A (and Layer B too, whenever
@@ -421,12 +492,13 @@ first launch -- expected for now, not a broken build.
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (35) | Selects Layer A, the main active shader preset |
-| Layer B | choice (35) | The second, independently-chosen preset Layer Mix blends in |
+| Preset | choice (45) | Selects Layer A, the main active shader preset |
+| Layer B | choice (45) | The second, independently-chosen preset Layer Mix blends in |
 | Blend Mode | choice (6) | How Layer B combines with Layer A: Crossfade, Add, Screen, Multiply, Difference, Lighten |
 | Layer Mix | 0–1 | How much of Layer B (combined via Blend Mode) shows over Layer A |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
-| Bass / Mid / Treble Gain | 0–2 each | Per-band weighting before it hits the shaders |
+| Bass / Mid / Treble Gain | 0–2 each | Per-band weighting after analysis, before it hits the shaders |
+| EQ Low / Mid / High | ±18dB each | Real pre-analysis EQ — reshapes the signal itself before FFT/band analysis; output to the DAW is untouched either way |
 | Zoom Speed | -1–1 | Fractal zoom/travel rate (autopilot presets) |
 | Rotation Speed | -1–1 | Rotation rate |
 | Hue | 0–1 | Base color hue (phase offset within the palette) |
@@ -482,6 +554,11 @@ first launch -- expected for now, not a broken build.
    (nothing gets dimmed for that preset) rather than dimming incorrectly.
 6. Re-run CMake configure (new shader files need to be picked up by the
    `file(GLOB ...)` in `CMakeLists.txt`) and rebuild.
+7. Optionally add it to a category (or a new one) in `presetCategories()`
+   (same file) so it's grouped sensibly in the Preset/Layer B dropdowns —
+   purely a display concern, looked up by name via `indexOf()`, so it can
+   never desync the real choice-parameter index above. Skipping this just
+   means the preset shows up under an auto-generated "Other" heading.
 
 ## Known follow-ups
 

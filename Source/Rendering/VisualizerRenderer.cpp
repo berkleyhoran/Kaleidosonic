@@ -488,6 +488,7 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     stereoScope             = makeUniformIfPresent(program, "uStereoScope");
     stereoWidth             = makeUniformIfPresent(program, "uStereoWidth");
     correlation             = makeUniformIfPresent(program, "uCorrelation");
+    bounceState             = makeUniformIfPresent(program, "uBounceState");
 }
 
 VisualizerRenderer::BlitUniforms::BlitUniforms(juce::OpenGLShaderProgram& program)
@@ -688,6 +689,14 @@ void VisualizerRenderer::newOpenGLContextCreated()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, AudioAnalyzer::stereoScopeSize, 1, 0, GL_RG, GL_FLOAT, nullptr);
 
+    glGenTextures(1, &bounceStateTexture);
+    glBindTexture(GL_TEXTURE_2D, bounceStateTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, kNumBounceShapes, 1, 0, GL_RGBA, GL_FLOAT, nullptr);
+
     // Perturbation reference orbit textures, one per fractal slot: one
     // texel per iteration, RGBA32F = (re.hi, re.lo, im.hi, im.lo). Nearest
     // filtering + texelFetch on the GPU side, since these are indexed
@@ -772,6 +781,12 @@ void VisualizerRenderer::openGLContextClosing()
     {
         glDeleteTextures(1, &stereoScopeTexture);
         stereoScopeTexture = 0;
+    }
+
+    if (bounceStateTexture != 0)
+    {
+        glDeleteTextures(1, &bounceStateTexture);
+        bounceStateTexture = 0;
     }
 
     if (userImageTexture != 0)
@@ -905,6 +920,87 @@ void VisualizerRenderer::updateNavigators(float dt)
     }
 }
 
+void VisualizerRenderer::updateBounceShapes(float dt)
+{
+    // Bounds match exactly what bouncing_shapes.frag itself computes for
+    // the visible frame (aspect-correct half-extents divided by Camera
+    // Scale), so the simulation and the shader always agree on where the
+    // walls actually are.
+    const float cameraScaleValue = params.cameraScale != nullptr ? params.cameraScale->load() : 1.0f;
+    const float aspect = frameHeight > 0.0f ? frameWidth / frameHeight : 1.0f;
+    const float halfW = (aspect * 0.5f) / juce::jmax(cameraScaleValue, 0.05f);
+    const float halfH = 0.5f / juce::jmax(cameraScaleValue, 0.05f);
+
+    if (! bounceShapesInitialised)
+    {
+        std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+        for (int i = 0; i < kNumBounceShapes; ++i)
+        {
+            auto& s = bounceShapes[(size_t) i];
+            s.size = juce::jmap(unit(navigatorRng), 0.1f, 0.2f);
+            const float bx = juce::jmax(halfW - s.size, 0.02f);
+            const float by = juce::jmax(halfH - s.size, 0.02f);
+            s.pos = { juce::jmap(unit(navigatorRng), -bx, bx), juce::jmap(unit(navigatorRng), -by, by) };
+            const float speed = juce::jmap(unit(navigatorRng), 0.25f, 0.55f);
+            const float angle = unit(navigatorRng) * juce::MathConstants<float>::twoPi;
+            s.vel = { std::cos(angle) * speed, std::sin(angle) * speed };
+            s.shapeType = i % 3;
+        }
+        bounceShapesInitialised = true;
+    }
+
+    // Bass/onset give the whole simulation a little extra kinetic energy --
+    // consistent with every other preset's "Camera Shake scales how hard
+    // audio drives motion" convention -- by nudging speed up rather than
+    // teleporting positions, so it never looks like a glitch.
+    const float cameraShakeValue = params.cameraShake != nullptr ? params.cameraShake->load() : 1.0f;
+    const float speedBoost = 1.0f + (analyzer.getBassAutoGain() * 0.4f + onsetEnvelope * 0.5f) * cameraShakeValue;
+
+    for (auto& s : bounceShapes)
+    {
+        s.pos += s.vel * (dt * speedBoost);
+
+        const float bx = juce::jmax(halfW - s.size, 0.02f);
+        const float by = juce::jmax(halfH - s.size, 0.02f);
+        if (s.pos.x < -bx) { s.pos.x = -bx; s.vel.x = std::abs(s.vel.x); }
+        else if (s.pos.x > bx) { s.pos.x = bx; s.vel.x = -std::abs(s.vel.x); }
+        if (s.pos.y < -by) { s.pos.y = -by; s.vel.y = std::abs(s.vel.y); }
+        else if (s.pos.y > by) { s.pos.y = by; s.vel.y = -std::abs(s.vel.y); }
+    }
+
+    // Real pairwise elastic collisions (equal masses, so it's just an
+    // exchange of the velocity component along the contact normal) plus a
+    // hard positional separation so overlapping shapes don't stick -- this
+    // is what actually makes them bounce off each other rather than
+    // passing through/sitting merged together.
+    for (int i = 0; i < kNumBounceShapes; ++i)
+    {
+        for (int j = i + 1; j < kNumBounceShapes; ++j)
+        {
+            auto& a = bounceShapes[(size_t) i];
+            auto& b = bounceShapes[(size_t) j];
+            const juce::Point<float> delta = b.pos - a.pos;
+            const float dist = delta.getDistanceFromOrigin();
+            const float minDist = a.size + b.size;
+            if (dist < minDist && dist > 1.0e-4f)
+            {
+                const juce::Point<float> normal = delta / dist;
+                const float overlap = minDist - dist;
+                a.pos -= normal * (overlap * 0.5f);
+                b.pos += normal * (overlap * 0.5f);
+
+                const juce::Point<float> relVel = b.vel - a.vel;
+                const float velAlongNormal = relVel.x * normal.x + relVel.y * normal.y;
+                if (velAlongNormal < 0.0f)
+                {
+                    a.vel += normal * velAlongNormal;
+                    b.vel -= normal * velAlongNormal;
+                }
+            }
+        }
+    }
+}
+
 void VisualizerRenderer::uploadOrbitTextureIfDirty(FractalNavigator& nav, GLuint texture)
 {
     if (! nav.consumeOrbitDirty())
@@ -943,6 +1039,20 @@ void VisualizerRenderer::updateStereoScopeTexture()
     glBindTexture(GL_TEXTURE_2D, stereoScopeTexture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, AudioAnalyzer::stereoScopeSize, 1, GL_RG, GL_FLOAT,
                      scopeInterleaved.data());
+}
+
+void VisualizerRenderer::updateBounceStateTexture()
+{
+    for (int i = 0; i < kNumBounceShapes; ++i)
+    {
+        const auto& s = bounceShapes[(size_t) i];
+        bounceStateSnapshot[(size_t) i * 4 + 0] = s.pos.x;
+        bounceStateSnapshot[(size_t) i * 4 + 1] = s.pos.y;
+        bounceStateSnapshot[(size_t) i * 4 + 2] = s.size;
+        bounceStateSnapshot[(size_t) i * 4 + 3] = (float) s.shapeType;
+    }
+    glBindTexture(GL_TEXTURE_2D, bounceStateTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kNumBounceShapes, 1, GL_RGBA, GL_FLOAT, bounceStateSnapshot.data());
 }
 
 void VisualizerRenderer::setSourceImage(const juce::Image& image)
@@ -1166,6 +1276,10 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     glBindTexture(GL_TEXTURE_2D, stereoScopeTexture);
     setU(u.stereoScope, (GLint) 5);
 
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, bounceStateTexture);
+    setU(u.bounceState, (GLint) 6);
+
     setU(u.stereoWidth, analyzer.getStereoWidth());
     setU(u.correlation, analyzer.getCorrelation());
 
@@ -1227,6 +1341,8 @@ void VisualizerRenderer::renderOpenGL()
     updateStereoScopeTexture();
     uploadUserImageIfDirty(dt);
     updateNavigators(dt);
+    updateBounceShapes(dt);
+    updateBounceStateTexture();
 
     const int numPresets = (int) presets.size();
     if (numPresets == 0)

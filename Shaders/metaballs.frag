@@ -2,7 +2,7 @@
 // breathing organic blob via the standard smooth-min CSG blend, camera
 // slowly circling the whole cluster. A genuinely different "camera orbits
 // a fixed structure" read from the infinite-flythrough presets (Shape
-// Rave, the tunnels) -- same family as Rotating Light Logo. Bass
+// Rave, the tunnels). Bass
 // swells each ball's radius and the blend softness together (so the fuse
 // visibly breathes on the beat), onset flashes a rim-light kick, and when
 // an image (or GIF) is loaded its colors paint across the fused surface

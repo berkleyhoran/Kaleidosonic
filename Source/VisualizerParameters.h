@@ -23,6 +23,14 @@ namespace ParamIDs
     static const juce::String bassGain               { "bassGain" };
     static const juce::String midGain                { "midGain" };
     static const juce::String trebleGain             { "trebleGain" };
+    // Real pre-analysis EQ (dB) -- reshapes the signal itself, before FFT/
+    // band analysis ever sees it, unlike Bass/Mid/Treble Gain above (which
+    // scale the *already-analyzed* bass/mid/treble numbers after the fact).
+    // See AudioAnalyzer::setEqGains. Output to the DAW is never touched --
+    // this only changes what gets analyzed/visualized.
+    static const juce::String eqLowGain              { "eqLowGain" };
+    static const juce::String eqMidGain              { "eqMidGain" };
+    static const juce::String eqHighGain             { "eqHighGain" };
     static const juce::String zoomSpeed              { "zoomSpeed" };
     static const juce::String rotationSpeed          { "rotationSpeed" };
     static const juce::String hue                    { "hue" };
@@ -85,7 +93,12 @@ namespace BlendModeNames
 
 // Names of the built-in presets, in the order they are compiled/selected.
 // Kept here (rather than only in PresetManager) so the APVTS choice
-// parameter and the renderer's preset list can never drift apart.
+// parameter and the renderer's preset list can never drift apart. The Logo
+// category (Rotating Light Logo, Neon Logo, Logo Hologram) was removed
+// outright -- see PresetCategories below for how these are grouped in the
+// editor's dropdown; that grouping is purely a display concern and does NOT
+// change this flat index order, so existing host automation/saved projects
+// pointing at a given index keep pointing at the same preset.
 namespace PresetNames
 {
     static const juce::StringArray all {
@@ -114,7 +127,6 @@ namespace PresetNames
         "Image Kaleidoscope",
         "Shape Rave",
         "Infinite Maze",
-        "Rotating Light Logo",
         "Wireframe Tunnel",
         "Metaballs",
         "Crystal Cave",
@@ -122,10 +134,36 @@ namespace PresetNames
         "Radial Spectrum",
         "Stereo Field",
         "Wispy Ribbons",
-        "Neon Logo",
-        "Logo Hologram"
+        "Video Feedback",
+        "Tri-Color Waves",
+        "Wave Sphere",
+        "Image Fragments",
+        "Image Feedback Zoom",
+        "Ocean Floor",
+        "Water Ripples",
+        "Jelly Polygons",
+        "Goopy Slime",
+        "Drippy Liquid",
+        "Bouncing Shapes",
+        "2D Flames",
+        "Energy Tunnel"
     };
 }
+
+// Purely a display grouping for the editor's Preset/Layer B dropdowns
+// (juce::ComboBox section headings) -- every preset's actual index into
+// PresetNames::all/APVTS is unchanged by category membership, so this can
+// be edited freely (new categories, presets moved between them) without
+// ever touching automation/saved-project compatibility. Each category's
+// `names` must be a subset of PresetNames::all; the editor looks up each
+// name's real index via indexOf() rather than assuming contiguous ranges,
+// so this doesn't even need to line up with PresetNames::all's own order.
+struct PresetCategory
+{
+    juce::String title;
+    juce::StringArray names;
+};
+const std::vector<PresetCategory>& presetCategories();
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -161,6 +199,9 @@ struct VisualizerParameterRefs
     std::atomic<float>* bassGain           = nullptr;
     std::atomic<float>* midGain            = nullptr;
     std::atomic<float>* trebleGain         = nullptr;
+    std::atomic<float>* eqLowGain          = nullptr;
+    std::atomic<float>* eqMidGain          = nullptr;
+    std::atomic<float>* eqHighGain         = nullptr;
     std::atomic<float>* zoomSpeed          = nullptr;
     std::atomic<float>* rotationSpeed      = nullptr;
     std::atomic<float>* hue                = nullptr;

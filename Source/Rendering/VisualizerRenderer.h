@@ -73,7 +73,7 @@ private:
             feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
             fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
             ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded,
-            mazePos, mazeHeading, spectrum, stereoScope, stereoWidth, correlation;
+            mazePos, mazeHeading, spectrum, stereoScope, stereoWidth, correlation, bounceState;
     };
 
     struct CompiledPreset
@@ -131,6 +131,7 @@ private:
     void setCommonUniforms(CommonUniforms& u, GLuint prevFrameTex, float onsetEnvelope, int presetIndex);
     void updateWaveformTexture();
     void updateNavigators(float dt);
+    void updateBounceShapes(float dt);
     void uploadOrbitTextureIfDirty(FractalNavigator& nav, GLuint texture);
     FractalSlot* slotForPreset(int presetIndex);
 
@@ -237,6 +238,29 @@ private:
     // maze itself is a pure function of grid coordinates evaluated
     // independently (and identically) on both sides.
     MazeWalker mazeWalker;
+
+    // "Bouncing Shapes" preset physics: real elastic collisions (both
+    // shape-vs-shape and shape-vs-screen-edge) are only meaningful with
+    // actual simulation state carried frame to frame -- unlike every other
+    // preset's motion, this genuinely can't be a pure function of uTime,
+    // since two shapes' collision depends on where they actually are,
+    // which depends on their whole prior history of collisions. Ticked
+    // once per frame in updateBounceShapes() alongside the other
+    // navigators, then uploaded to a small texture (one texel per shape:
+    // R=x, G=y, B=size, A=shapeType) the same way spectrum/stereoScope
+    // above are -- see common.glsl's kNumBounceShapes/uBounceState.
+    struct BounceShapeState
+    {
+        juce::Point<float> pos, vel;
+        float size = 0.15f;
+        int shapeType = 0;
+    };
+    static constexpr int kNumBounceShapes = 6;
+    std::array<BounceShapeState, (size_t) kNumBounceShapes> bounceShapes {};
+    bool bounceShapesInitialised = false;
+    GLuint bounceStateTexture = 0;
+    std::array<float, (size_t) kNumBounceShapes * 4> bounceStateSnapshot {};
+    void updateBounceStateTexture();
 
     double startTimeMs = 0.0;
     double lastFrameTimeMs = 0.0;

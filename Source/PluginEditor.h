@@ -11,12 +11,14 @@
 //
 // The panel is organized into collapsible sections (see
 // VisualizerParameters.h's paramGroups()) instead of one long flat list --
-// with 35 parameters across 22 presets, a flat list stopped being
+// with dozens of parameters across 40+ presets, a flat list stopped being
 // scannable. Whichever sliders the *current* preset's shader doesn't
 // actually read (see isParamRelevantForPreset) are dimmed and disabled
 // (not hidden -- the value is still real, still automatable from the DAW,
 // and switching presets or morphing can make it matter again) so it's
-// obvious at a glance what's worth touching right now.
+// obvious at a glance what's worth touching right now. The Preset/Layer B
+// dropdowns are further grouped into categories (see presetCategories())
+// purely for scanability -- see populatePresetComboWithCategories.
 class KaleidosonicAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
@@ -111,6 +113,20 @@ private:
     ParamSlider* addParamSlider(juce::Component& parent, const juce::String& paramID,
                                  const juce::String& displayName);
 
+    // Fills a preset ComboBox (Preset / Layer B) with juce::ComboBox
+    // section headings grouping presets by presetCategories(), each item's
+    // ID pinned to its real PresetNames::all index + 1 -- see the
+    // definition for why grouping can never desync the underlying flat
+    // choice-parameter index.
+    void populatePresetComboWithCategories(juce::ComboBox& box);
+
+    // Builds an ID-based (not position-based) attachment between an APVTS
+    // choice parameter and a ComboBox -- see the presetAttachment member's
+    // comment for why the stock ComboBoxAttachment can't be used once
+    // presets are grouped into categories.
+    std::unique_ptr<juce::ParameterAttachment> makeIdBasedComboAttachment(const juce::String& paramID,
+                                                                            juce::ComboBox& box);
+
     // "Load Image..." for the image-reactive presets (Image Ripple/Shatter/
     // Kaleidoscope). Opens an async FileChooser (required -- a modal one
     // would block the message thread), and on success hands the decoded
@@ -156,7 +172,22 @@ private:
 
     juce::ComboBox presetBox;
     juce::Label presetLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> presetAttachment;
+    // NOT a juce::AudioProcessorValueTreeState::ComboBoxAttachment -- that
+    // class maps the parameter's value to comboBox.getSelectedItemIndex()/
+    // setSelectedItemIndex() (POSITION among real items in insertion
+    // order), completely ignoring the item ID passed to addItem(). Once
+    // presets are grouped into categories (populatePresetComboWithCategories)
+    // their insertion-order position no longer matches their real
+    // PresetNames::all index, so that attachment class would silently
+    // select the wrong preset -- confirmed against JUCE's own
+    // ComboBoxParameterAttachment::setValue/comboBoxChanged source
+    // (juce_ParameterAttachments.cpp), which is built entirely on
+    // getSelectedItemIndex()/setSelectedItemIndex(). The generic
+    // juce::ParameterAttachment below is wired by hand to use
+    // getSelectedId()/setSelectedId() instead -- the ID IS explicitly set
+    // to (real index + 1) in populatePresetComboWithCategories, so this is
+    // the one that's actually safe to reorder/group.
+    std::unique_ptr<juce::ParameterAttachment> presetAttachment;
 
     // Layer B / Blend Mode / Layer Mix: always visible, ungrouped, never
     // dimmed by updateParamRelevance -- same treatment as the Preset combo
@@ -164,7 +195,8 @@ private:
     // relevant setting.
     juce::ComboBox layerBBox;
     juce::Label layerBLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> layerBAttachment;
+    // Same ID-based attachment as presetAttachment above, same reason.
+    std::unique_ptr<juce::ParameterAttachment> layerBAttachment;
     juce::ComboBox blendModeBox;
     juce::Label blendModeLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> blendModeAttachment;

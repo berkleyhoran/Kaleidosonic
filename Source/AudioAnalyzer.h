@@ -16,6 +16,22 @@ public:
     void prepare(double sampleRate, int samplesPerBlock);
     void pushBlock(const juce::AudioBuffer<float>& buffer);
 
+    // Real pre-analysis 3-band EQ (dB, default 0 = flat/no effect). Shapes
+    // a *local copy* of the signal inside pushBlock() before ANY analysis
+    // reads it -- bass/mid/treble/spectrum/waveform/level/onset/stereo
+    // width all measure the filtered copy, not the original. The buffer
+    // pushBlock() is given (a const reference) is never written to, so the
+    // plugin's "audio passes through completely unmodified" promise to the
+    // host holds regardless of where these sit -- this only changes what
+    // gets analyzed/visualized, never what reaches the DAW's output. Same
+    // 250Hz/4kHz crossovers as the existing bass/mid/treble band split
+    // below, so e.g. cutting EQ High visibly pulls down the same highs the
+    // Treble meter and spectrum bars read. Just an atomic store -- safe to
+    // call once per block from whichever thread is about to call
+    // pushBlock() (the normal audio thread, or SystemAudioLoopbackCapture's
+    // own thread).
+    void setEqGains(float lowDb, float midDb, float highDb) noexcept;
+
     float getBass()    const noexcept { return bass.load(std::memory_order_relaxed); }
     float getMid()     const noexcept { return mid.load(std::memory_order_relaxed); }
     float getTreble()  const noexcept { return treble.load(std::memory_order_relaxed); }
@@ -82,6 +98,20 @@ private:
     static constexpr int fftSize = 1 << fftOrder; // 1024
 
     void runFFTOnFifo();
+    void updateEqCoefficients(float lowDb, float midDb, float highDb);
+
+    // Pre-analysis EQ state. Coefficients are shared between the L and R
+    // filter of each band (juce::dsp::IIR::Filter's `coefficients` member is
+    // a ref-counted Ptr) while each channel keeps its own independent
+    // internal history -- the standard JUCE pattern for a stereo filter
+    // pair driven by one set of controls.
+    std::atomic<float> eqLowDbTarget { 0.0f };
+    std::atomic<float> eqMidDbTarget { 0.0f };
+    std::atomic<float> eqHighDbTarget { 0.0f };
+    float appliedEqLowDb = 0.0f, appliedEqMidDb = 0.0f, appliedEqHighDb = 0.0f;
+    juce::dsp::IIR::Filter<float> eqLowShelfL, eqLowShelfR;
+    juce::dsp::IIR::Filter<float> eqMidPeakL, eqMidPeakR;
+    juce::dsp::IIR::Filter<float> eqHighShelfL, eqHighShelfR;
 
     juce::dsp::FFT fft { fftOrder };
     juce::dsp::WindowingFunction<float> window { (size_t) fftSize, juce::dsp::WindowingFunction<float>::hann };

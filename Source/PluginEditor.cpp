@@ -26,6 +26,72 @@ void KaleidosonicAudioProcessorEditor::GroupHeader::mouseUp(const juce::MouseEve
         onToggle();
 }
 
+std::unique_ptr<juce::ParameterAttachment> KaleidosonicAudioProcessorEditor::makeIdBasedComboAttachment(
+    const juce::String& paramID, juce::ComboBox& box)
+{
+    // See the member declaration's comment (PluginEditor.h) for why this
+    // exists instead of juce::AudioProcessorValueTreeState::ComboBoxAttachment:
+    // that class drives the box via getSelectedItemIndex()/
+    // setSelectedItemIndex() (list POSITION), which breaks the moment
+    // items are grouped out of PresetNames::all order. This one uses
+    // getSelectedId()/setSelectedId() instead, matching the (real index +
+    // 1) IDs populatePresetComboWithCategories actually assigns.
+    auto* param = processorRef.apvts.getParameter(paramID);
+    jassert(param != nullptr);
+    if (param == nullptr)
+        return nullptr;
+
+    auto attachment = std::make_unique<juce::ParameterAttachment>(
+        *param,
+        [&box](float newValue) { box.setSelectedId(juce::roundToInt(newValue) + 1, juce::dontSendNotification); },
+        nullptr);
+
+    auto* rawAttachment = attachment.get();
+    box.onChange = [&box, rawAttachment]
+    { rawAttachment->setValueAsCompleteGesture((float) (box.getSelectedId() - 1)); };
+
+    attachment->sendInitialUpdate();
+    return attachment;
+}
+
+void KaleidosonicAudioProcessorEditor::populatePresetComboWithCategories(juce::ComboBox& box)
+{
+    // Section headings purely for readability -- every item's ID is set
+    // explicitly to (its real PresetNames::all index + 1) rather than
+    // relying on insertion order, so grouping presets under headings here
+    // can never desync from the flat APVTS choice-parameter index that
+    // automation, saved projects, and the renderer all actually use.
+    box.clear(juce::dontSendNotification);
+    std::vector<bool> placed((size_t) PresetNames::all.size(), false);
+    for (const auto& category : presetCategories())
+    {
+        box.addSectionHeading(category.title);
+        for (const auto& name : category.names)
+        {
+            const int index = PresetNames::all.indexOf(name);
+            if (index < 0)
+                continue; // stale category entry -- fail safe, just skip it
+            box.addItem(name, index + 1);
+            placed[(size_t) index] = true;
+        }
+    }
+    // Anything not (yet) assigned to a category still needs to be
+    // selectable -- fail open into a catch-all heading instead of silently
+    // dropping it from the dropdown.
+    bool addedOther = false;
+    for (int i = 0; i < PresetNames::all.size(); ++i)
+    {
+        if (placed[(size_t) i])
+            continue;
+        if (! addedOther)
+        {
+            box.addSectionHeading("Other");
+            addedOther = true;
+        }
+        box.addItem(PresetNames::all[i], i + 1);
+    }
+}
+
 KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicAudioProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p), renderer(p.analyzer, p.paramRefs)
 {
@@ -34,19 +100,17 @@ KaleidosonicAudioProcessorEditor::KaleidosonicAudioProcessorEditor(KaleidosonicA
     presetLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     controlsContent.addAndMakeVisible(presetLabel);
 
-    presetBox.addItemList(PresetNames::all, 1);
+    populatePresetComboWithCategories(presetBox);
     controlsContent.addAndMakeVisible(presetBox);
-    presetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, ParamIDs::presetIndex, presetBox);
+    presetAttachment = makeIdBasedComboAttachment(ParamIDs::presetIndex, presetBox);
 
     layerBLabel.setText("Layer B", juce::dontSendNotification);
     layerBLabel.setJustificationType(juce::Justification::left);
     layerBLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     controlsContent.addAndMakeVisible(layerBLabel);
-    layerBBox.addItemList(PresetNames::all, 1);
+    populatePresetComboWithCategories(layerBBox);
     controlsContent.addAndMakeVisible(layerBBox);
-    layerBAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, ParamIDs::layerBIndex, layerBBox);
+    layerBAttachment = makeIdBasedComboAttachment(ParamIDs::layerBIndex, layerBBox);
 
     blendModeLabel.setText("Blend Mode", juce::dontSendNotification);
     blendModeLabel.setJustificationType(juce::Justification::left);

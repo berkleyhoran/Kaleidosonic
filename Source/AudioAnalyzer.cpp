@@ -1,10 +1,22 @@
 #include "AudioAnalyzer.h"
+#include <limits>
 
 namespace
 {
     constexpr float bassLoHz = 20.0f,   bassHiHz = 250.0f;
     constexpr float midLoHz  = 250.0f,  midHiHz  = 4000.0f;
     constexpr float trebLoHz = 4000.0f, trebHiHz = 16000.0f;
+
+    // Pre-analysis EQ band centers -- the shelves sit right at the same
+    // 250Hz/4kHz crossovers bass/mid/treble are bucketed at above, so the
+    // three EQ sliders visibly move the same energy the meters/spectrum
+    // read. Mid is a peaking bell roughly centered between the two shelves
+    // (geometric mean of 250 and 4000 is ~1000Hz).
+    constexpr float eqLowShelfHz = 250.0f;
+    constexpr float eqHighShelfHz = 4000.0f;
+    constexpr float eqMidHz = 1000.0f;
+    constexpr float eqMidQ = 0.7f;
+    constexpr float eqShelfQ = 0.7071f; // Butterworth-ish, standard shelf default
 
     // Raw FFT magnitude has no fixed ceiling, so squash it into a soft 0..1
     // range instead of a hard clip. The constant is a "typical loud music"
@@ -67,6 +79,43 @@ void AudioAnalyzer::prepare(double newSampleRate, int /*samplesPerBlock*/)
         s.store(0.0f, std::memory_order_relaxed);
     spectrumSmoothed.fill(0.0f);
     spectrumPeaks.fill(0.05f);
+
+    eqLowShelfL.reset();
+    eqLowShelfR.reset();
+    eqMidPeakL.reset();
+    eqMidPeakR.reset();
+    eqHighShelfL.reset();
+    eqHighShelfR.reset();
+    // Re-derive coefficients at the new sample rate even if the dB targets
+    // themselves haven't changed -- appliedEq*Db tracks what was last
+    // *computed*, and a shelf/peak filter's coefficients are sample-rate
+    // dependent, so a rate change alone must force a recompute.
+    appliedEqLowDb = appliedEqMidDb = appliedEqHighDb = std::numeric_limits<float>::quiet_NaN();
+}
+
+void AudioAnalyzer::setEqGains(float lowDb, float midDb, float highDb) noexcept
+{
+    eqLowDbTarget.store(lowDb, std::memory_order_relaxed);
+    eqMidDbTarget.store(midDb, std::memory_order_relaxed);
+    eqHighDbTarget.store(highDb, std::memory_order_relaxed);
+}
+
+void AudioAnalyzer::updateEqCoefficients(float lowDb, float midDb, float highDb)
+{
+    const auto lowGain = juce::Decibels::decibelsToGain(lowDb);
+    const auto midGain = juce::Decibels::decibelsToGain(midDb);
+    const auto highGain = juce::Decibels::decibelsToGain(highDb);
+
+    auto lowCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sampleRate, eqLowShelfHz, eqShelfQ, lowGain);
+    auto midCoeffs = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sampleRate, eqMidHz, eqMidQ, midGain);
+    auto highCoeffs = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate, eqHighShelfHz, eqShelfQ, highGain);
+
+    eqLowShelfL.coefficients = lowCoeffs;
+    eqLowShelfR.coefficients = lowCoeffs;
+    eqMidPeakL.coefficients = midCoeffs;
+    eqMidPeakR.coefficients = midCoeffs;
+    eqHighShelfL.coefficients = highCoeffs;
+    eqHighShelfR.coefficients = highCoeffs;
 }
 
 void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
@@ -78,6 +127,23 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
 
     float blockSumSquares = 0.0f;
 
+    // Recompute EQ coefficients only when a control actually moved (or the
+    // sample rate changed -- see prepare()'s NaN reset), not every block --
+    // cheap either way, but there's no reason to redo three filter designs
+    // per callback when nothing changed.
+    {
+        const float wantLowDb = eqLowDbTarget.load(std::memory_order_relaxed);
+        const float wantMidDb = eqMidDbTarget.load(std::memory_order_relaxed);
+        const float wantHighDb = eqHighDbTarget.load(std::memory_order_relaxed);
+        if (wantLowDb != appliedEqLowDb || wantMidDb != appliedEqMidDb || wantHighDb != appliedEqHighDb)
+        {
+            updateEqCoefficients(wantLowDb, wantMidDb, wantHighDb);
+            appliedEqLowDb = wantLowDb;
+            appliedEqMidDb = wantMidDb;
+            appliedEqHighDb = wantHighDb;
+        }
+    }
+
     // Pre-downmix L/R for stereo width/correlation and the goniometer scope
     // -- everything else in this function still works from the mono `sample`
     // below, so this is purely additive. A mono source (numChannels == 1)
@@ -86,8 +152,16 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
 
     for (int i = 0; i < numSamples; ++i)
     {
-        const float l = buffer.getSample(0, i);
-        const float r = numChannels > 1 ? buffer.getSample(1, i) : l;
+        float l = buffer.getSample(0, i);
+        float r = numChannels > 1 ? buffer.getSample(1, i) : l;
+
+        // Real pre-analysis EQ: reshapes only these local l/r copies --
+        // `buffer` itself (what actually reaches the DAW) is never
+        // touched, per pushBlock()'s const juce::AudioBuffer<float>&
+        // parameter. Every analysis step below (width/correlation, scope,
+        // mono downmix, FFT) reads the filtered values from here on.
+        l = eqHighShelfL.processSample(eqMidPeakL.processSample(eqLowShelfL.processSample(l)));
+        r = eqHighShelfR.processSample(eqMidPeakR.processSample(eqLowShelfR.processSample(r)));
 
         sumLL += l * l;
         sumRR += r * r;
@@ -102,10 +176,10 @@ void AudioAnalyzer::pushBlock(const juce::AudioBuffer<float>& buffer)
         scopeRight[(size_t) scopeIndex].store(r, std::memory_order_relaxed);
         scopeWriteIndex.store((scopeIndex + 1) % stereoScopeSize, std::memory_order_relaxed);
 
-        float sample = 0.0f;
-        for (int ch = 0; ch < numChannels; ++ch)
-            sample += buffer.getSample(ch, i);
-        sample /= (float) numChannels;
+        // numChannels is always 1 or 2 (see isBusesLayoutSupported), so this
+        // is just the already-filtered l/r averaged -- no need to re-read
+        // `buffer` (and re-reading it here would bypass the EQ above).
+        const float sample = numChannels > 1 ? (l + r) * 0.5f : l;
 
         blockSumSquares += sample * sample;
 

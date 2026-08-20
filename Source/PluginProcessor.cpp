@@ -45,6 +45,15 @@ void KaleidosonicAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
 void KaleidosonicAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // Updated unconditionally, even in system-audio-loopback mode where
+    // this thread never calls pushBlock() itself -- just an atomic store,
+    // and it's what SystemAudioLoopbackCapture's own pushBlock() call (from
+    // its own thread) picks up next time it runs.
+    analyzer.setEqGains(paramRefs.eqLowGain != nullptr ? paramRefs.eqLowGain->load() : 0.0f,
+                         paramRefs.eqMidGain != nullptr ? paramRefs.eqMidGain->load() : 0.0f,
+                         paramRefs.eqHighGain != nullptr ? paramRefs.eqHighGain->load() : 0.0f);
+
 #if JUCE_WINDOWS
     if (! systemAudioCaptureEnabled)
         analyzer.pushBlock(buffer);

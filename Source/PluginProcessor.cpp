@@ -1,6 +1,18 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#if JUCE_WINDOWS
+// Only used from setSystemAudioCaptureEnabled() below, itself already
+// gated to real Standalone instances at *runtime* via wrapperType (see
+// that function's own comment) -- StandalonePluginHolder is entirely
+// header-only/inline (no separate .cpp providing its definitions), so
+// including it here is safe to compile into every format's shared code
+// object the same way the rest of this file already is: in a VST3/AU
+// build getInstance() simply returns nullptr (nothing ever constructs one
+// there), guarded below anyway.
+#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#endif
+
 KaleidosonicAudioProcessor::KaleidosonicAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -100,6 +112,18 @@ void KaleidosonicAudioProcessor::setSystemAudioCaptureEnabled(bool enabled)
         if (systemAudioCapture->start(analyzer))
         {
             systemAudioCaptureEnabled = true;
+
+            // JUCE's built-in Standalone window shows an "Audio input is
+            // muted to avoid feedback loop" banner whenever the normal
+            // input is muted -- which it is by default, since this
+            // processor declares both an input and output bus. That
+            // warning is about the normal mic/line input, which isn't
+            // even being read right now: pushBlock() only ever gets fed
+            // from the WASAPI loopback thread while capture is on (see
+            // processBlock()'s guard above), so the banner is just noise
+            // in this mode. Auto-unmuting suppresses it.
+            if (auto* holder = juce::StandalonePluginHolder::getInstance())
+                holder->getMuteInputValue().setValue(false);
         }
         else
         {
@@ -113,6 +137,12 @@ void KaleidosonicAudioProcessor::setSystemAudioCaptureEnabled(bool enabled)
         systemAudioCapture->stop();
         systemAudioCaptureEnabled = false;
         analyzer.prepare(lastPreparedSampleRate, lastPreparedSamplesPerBlock);
+
+        // Restore the normal muted-by-default state now that the real
+        // input is what's actually feeding the analyzer again -- the
+        // feedback-loop warning is legitimate once more.
+        if (auto* holder = juce::StandalonePluginHolder::getInstance())
+            holder->getMuteInputValue().setValue(true);
     }
 }
 #endif

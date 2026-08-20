@@ -149,7 +149,7 @@ private:
     std::atomic<float> pendingPanY { 0.0f };
 
     // Unbounded, continuously-shrinking zoom scale used by the exactly-
-    // self-similar IFS/DE presets (Sierpinski, Apollonian, Julia) for
+    // self-similar IFS/DE presets (Sierpinski, Julia) for
     // genuinely continuous deep zoom -- updated the same iterative way as
     // FractalNavigator's viewRadius (never recomputed from a growing
     // exponent, which is what would underflow). See updateNavigators()

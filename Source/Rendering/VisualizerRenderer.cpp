@@ -904,7 +904,7 @@ void VisualizerRenderer::updateNavigators(float dt)
     zoomPhase -= std::floor(zoomPhase);
 
     // Unbounded zoom scale for the exactly-self-similar IFS/DE presets
-    // (Sierpinski, Apollonian, Julia): multiplied down every frame just
+    // (Sierpinski, Julia): multiplied down every frame just
     // like FractalNavigator's viewRadius (same `rate`, so all the dive-
     // style presets stay in sync with Zoom Speed/Camera Shake), NOT
     // recomputed from a growing log-depth via exp() -- that would

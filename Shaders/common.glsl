@@ -65,8 +65,8 @@ uniform float uFractalIterNeed;
 // Unbounded, continuously-shrinking zoom scale (a double-float hi/lo pair,
 // updated the same iterative way as FractalNavigator's viewRadius -- never
 // recomputed from a growing exponent, which is what would underflow) used
-// by the exactly-self-similar IFS/DE presets (Sierpinski, Apollonian,
-// Julia) for genuinely continuous deep zoom. Unlike escape-time fractals,
+// by the exactly-self-similar IFS/DE presets (Sierpinski, Julia) for
+// genuinely continuous deep zoom. Unlike escape-time fractals,
 // self-similar folds don't accumulate chaotic error, so running the fold
 // loop itself in double-float (not just the initial multiply -- the whole
 // loop needs that precision to "unfold" back out of a deeply-zoomed
@@ -179,7 +179,7 @@ vec3 grade(vec3 col)
 // (hi, lo) pair of float32s so hi+lo carries ~45 bits of precision
 // instead of float32's ~23, well past the classic GPU-fractal "turns to
 // blocky mush" precision wall of plain float32 (~1e6x). Used two ways
-// here: directly, for the IFS/DE presets' (Sierpinski/Apollonian/Julia)
+// here: directly, for the IFS/DE presets' (Sierpinski/Julia)
 // continuous zoom, which reaches roughly 1e12-1e13x since their fold/
 // iteration doesn't need anything deeper; and as the per-pixel *delta*
 // storage in Mandelbrot Pulse/Burning Ship's perturbation theory (below),

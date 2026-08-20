@@ -12,7 +12,6 @@ namespace
         { BinaryData::plasma_feedback_frag,    BinaryData::plasma_feedback_fragSize },
         { BinaryData::tunnel_spiral_frag,      BinaryData::tunnel_spiral_fragSize },
         { BinaryData::burning_ship_frag,       BinaryData::burning_ship_fragSize },
-        { BinaryData::apollonian_frag,         BinaryData::apollonian_fragSize },
         { BinaryData::particle_bloom_frag,     BinaryData::particle_bloom_fragSize },
         { BinaryData::oscilloscope_frag,       BinaryData::oscilloscope_fragSize },
         { BinaryData::waveform_scope_frag,     BinaryData::waveform_scope_fragSize },

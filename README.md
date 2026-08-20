@@ -21,7 +21,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
 
 ## Features
 
-- **45 GLSL presets**, switchable and cross-fadable while the DAW automates
+- **44 GLSL presets**, switchable and cross-fadable while the DAW automates
   them, grouped into categories (Fractal Dives, Fractal Explorers, Fractal
   3D, Tunnels & Feedback, Particles & Fields, Waveforms & Analyzers, Image
   Reactive, Environments, Organic & Physics) in the Preset/Layer B dropdowns
@@ -71,8 +71,6 @@ Audio passes through completely unmodified — this is a pure visualizer.
     exponent wraps modulo log2(2) — the image at phase 0 and 1 is
     pixel-identical, so the dive is seamless forever in plain float
     precision. Crisp antialiased triangle edges, level-continuous colors.
-  - **Apollonian Gasket** — repeated circle-inversion folding, the classic
-    "infinite nested circles" fractal.
   - **Plasma Feedback**, **Tunnel Spiral**, **Particle Bloom**,
     **Oscilloscope Glow**, **Waveform Scope**, **Fractal Bubbles**,
     **Starfield Warp** — feedback, tunnel, particle, and scope-style
@@ -204,26 +202,31 @@ Audio passes through completely unmodified — this is a pure visualizer.
   - **Ocean Floor** — a sunlit sandy sea floor viewed from above: rippled
     sand ridges, swaying seaweed, animated caustic light nets, and god-ray
     light shafts descending from above, all under a strong, unmistakably
-    blue depth tint. Bass swells the ripple amplitude, treble sharpens the
-    caustic sparkle. Fully procedural (no raymarch).
+    blue depth tint. Deliberately not audio-reactive (an explicit user
+    call) -- an ambient, slowly-animating scene the audio sits over rather
+    than something that visibly reacts to it. Fully procedural (no
+    raymarch).
   - **Water Ripples** — rain-drop-style ripples landing on still water:
     many independent drops, each a fresh expanding damped-sine ring wave,
     summed together so overlapping rings genuinely interfere, then used to
     perturb a fake surface normal for a real specular glint rather than a
-    flat colored ring. Bass speeds up drop spawn rate, onset triggers an
-    extra strong ripple from center.
+    flat colored ring. Also deliberately not audio-reactive -- drops fall
+    on their own fixed schedule.
   - **Jelly Polygons** — the whole screen filled with soft, squishy N-gon
-    shapes smooth-min blended into each other, each one wobbling at its
-    own edge and the whole field squashing vertically on bass. Fully 2D,
-    no raymarch.
-  - **Goopy Slime** — a single continuous mass of viscous goo: a few big
-    lobes smooth-min merged into one oozing body that bulges with the bass.
+    shapes drifting calmly and smooth-min blended into each other, each
+    one wobbling gently at its own edge. Deliberately no movement-based
+    audio reactivity (drift speed/wobble/squash are all fixed) -- only the
+    color brightness pulse responds to the audio. Fully 2D, no raymarch.
+  - **Goopy Slime** — a single continuous mass of viscous goo, a lava-lamp
+    read: a few big lobes smooth-min merged into one slowly oozing body.
     Three things make it genuinely different from Metaballs rather than a
     reskin: a rolling sine-noise bump field perturbs the surface itself
-    for a boiling/lumpy read instead of Metaballs' clean spherical fusion,
-    a few thin tapering strands actually droop off the underside of the
-    mass down onto a floor below it (real dripping, not just an orbiting
+    for a lumpy read instead of Metaballs' clean spherical fusion, a few
+    thin tapering strands actually droop off the underside of the mass
+    down onto a floor below it (real dripping, not just an orbiting
     blob), and a hard, tight specular highlight for a wet-surface finish.
+    Calm/lava-lamp paced -- audio only affects brightness/glint, never
+    shape or motion.
   - **Bouncing Shapes** — circles, rounded squares, and triangles that
     genuinely bounce off the screen's actual edges *and* off each other,
     via a real CPU-side elastic-collision simulation
@@ -257,10 +260,9 @@ Audio passes through completely unmodified — this is a pure visualizer.
     nothing extra. The camera's own altitude tracks a much lower-frequency
     version of the same height field (the broad landscape trend only, no
     ridge/fine detail) rather than the full detailed terrain directly
-    underneath it, so it cruises smoothly over hills instead of bobbing
-    over every individual bump. Bass swells hill height, treble adds fine
-    ridge detail, and the flight path gently curves and banks into its
-    own turns.
+    underneath it. Deliberately calm and not audio-reactive (an explicit
+    user call after earlier versions curved/banked and reacted to bass) --
+    straight-line, level flight at a fixed altitude, nothing audio-driven.
 - **Particle Density / Particle Size** (0–2 each, default 1 = each
   preset's original look) for the three particle-field presets (Particle
   Bloom, Starfield Warp, Fractal Bubbles): Density scales how many of a
@@ -375,8 +377,8 @@ Three different mechanisms, matched to the math of each fractal family:
    iterations.
 2. **Exactly self-similar IFS fractals (Sierpinski)** — zoom into a fixed
    point of the self-similarity and wrap the zoom *exponent*; literally
-   infinite, seamless, plain float. (Apollonian/Julia use unbounded
-   double-float zoom to ~1e13x.)
+   infinite, seamless, plain float. (Julia uses unbounded double-float
+   zoom to ~1e13x.)
 3. **Bounded-fold raymarched 3D fractals (Mandelbox, Burning Ship 3D)** —
    the iterated fold keeps every value bounded by construction; detail
    comes from the fold itself, so ordinary float32 is plenty forever.
@@ -411,8 +413,8 @@ Shaders/
   mandelbrot_explorer.frag    burning_ship_explorer.frag
   perpendicular_ship.frag     buffalo.frag             tricorn.frag
   burning_ship_3d.frag        mandelbox.frag           sierpinski_triforce.frag
-  apollonian.frag             plasma_feedback.frag     tunnel_spiral.frag
-  particle_bloom.frag         oscilloscope.frag        waveform_scope.frag
+  plasma_feedback.frag        tunnel_spiral.frag       particle_bloom.frag
+  oscilloscope.frag            waveform_scope.frag
   fractal_bubbles.frag         starfield_warp.frag      audio_nebula.frag
   image_ripple.frag           image_shatter.frag       image_kaleidoscope.frag
   shape_rave.frag              infinite_maze.frag
@@ -511,8 +513,8 @@ first launch -- expected for now, not a broken build.
 
 | Parameter | Range | What it does |
 |---|---|---|
-| Preset | choice (45) | Selects Layer A, the main active shader preset |
-| Layer B | choice (45) | The second, independently-chosen preset Layer Mix blends in |
+| Preset | choice (44) | Selects Layer A, the main active shader preset |
+| Layer B | choice (44) | The second, independently-chosen preset Layer Mix blends in |
 | Blend Mode | choice (6) | How Layer B combines with Layer A: Crossfade, Add, Screen, Multiply, Difference, Lighten |
 | Layer Mix | 0–1 | How much of Layer B (combined via Blend Mode) shows over Layer A |
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
@@ -529,7 +531,7 @@ first launch -- expected for now, not a broken build.
 | Feedback | 0–0.98 | Internal trail persistence (Plasma Feedback preset only) |
 | Iterations | 4–64 | Fractal/tunnel detail depth (scales the escape-time base iteration budget) |
 | Distortion | 0–1 | Extra coordinate warping |
-| Zoom Wander | 0–2 | How far zoom targets wander (Julia/Apollonian-style presets) |
+| Zoom Wander | 0–2 | How far zoom targets wander (Julia-style presets) |
 | Camera Shake | 0–2 | How hard bass/onsets drive camera/zoom motion — independent of Reactivity |
 | Camera Scale | 0.2–6 | Manual zoom multiplier (autopilot/tunnel presets; explorers use wheel/arrows instead) |
 | Palette | 0–8 | Sweeps/crossfades through the curated cosine-gradient palettes |

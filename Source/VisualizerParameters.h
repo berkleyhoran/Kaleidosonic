@@ -117,7 +117,6 @@ namespace PresetNames
         "Plasma Feedback",
         "Tunnel Spiral",
         "Burning Ship",
-        "Apollonian Gasket",
         "Particle Bloom",
         "Oscilloscope Glow",
         "Waveform Scope",

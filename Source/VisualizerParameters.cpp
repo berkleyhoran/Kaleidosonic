@@ -156,126 +156,123 @@ namespace
             { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
               ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 5  Apollonian Gasket */
-            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
-              ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion, ParamIDs::zoomWander,
-              ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 6  Particle Bloom */
+            /* 5  Particle Bloom */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::kaleidoscopeSegments, ParamIDs::cameraScale, ParamIDs::particleDensity,
               ParamIDs::particleSize },
-            /* 7  Oscilloscope Glow */
+            /* 6  Oscilloscope Glow */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::kaleidoscopeSegments, ParamIDs::distortion },
-            /* 8  Waveform Scope */
+            /* 7  Waveform Scope */
             { ParamIDs::trebleGain },
-            /* 9  Sierpinski Triforce */
+            /* 8  Sierpinski Triforce */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 10 Fractal Bubbles */
+            /* 9  Fractal Bubbles */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::particleDensity,
               ParamIDs::particleSize },
-            /* 11 Starfield Warp */
+            /* 10 Starfield Warp */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::zoomWander, ParamIDs::cameraShake,
               ParamIDs::cameraScale, ParamIDs::particleDensity, ParamIDs::particleSize },
-            /* 12 Mandelbox */
+            /* 11 Mandelbox */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            // 13-17: the manual explorers all share exploreFractal() in
+            // 12-16: the manual explorers all share exploreFractal() in
             // common.glsl, which now adds a slight always-on Rotation
             // Speed/Zoom Speed/Distortion drift on top of the manual view
             // (see its own comment for why this doesn't fight manual nav).
-            /* 13 Mandelbrot Explorer */
+            /* 12 Mandelbrot Explorer */
             { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 14 Burning Ship Explorer */
+            /* 13 Burning Ship Explorer */
             { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 15 Perpendicular Ship */
+            /* 14 Perpendicular Ship */
             { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 16 Buffalo Fractal */
+            /* 15 Buffalo Fractal */
             { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 17 Tricorn */
+            /* 16 Tricorn */
             { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 18 Burning Ship 3D */
+            /* 17 Burning Ship 3D */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 19 Audio Nebula */
+            /* 18 Audio Nebula */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::distortion,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 20 Image Ripple */
+            /* 19 Image Ripple */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 21 Image Shatter */
+            /* 20 Image Shatter */
             { ParamIDs::bassGain, ParamIDs::distortion, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 22 Image Kaleidoscope */
+            /* 21 Image Kaleidoscope */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,
               ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 23 Shape Rave */
+            /* 22 Shape Rave */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 24 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
+            /* 23 Infinite Maze -- Zoom Speed/Camera Shake repurposed as walk speed/turn eagerness */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::zoomSpeed,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 25 Wireframe Tunnel */
+            /* 24 Wireframe Tunnel -- smooth constant zoom now */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale },
-            /* 26 Metaballs */
+            /* 25 Metaballs */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 27 Crystal Cave */
+            /* 26 Crystal Cave */
             { ParamIDs::bassGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 28 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
+            /* 27 Spectrum Bars -- reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
             { ParamIDs::palette },
-            /* 29 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
+            /* 28 Radial Spectrum -- Camera Scale zooms the whole ring, Rotation Speed spins it;
                also reads uSpectrum directly, not uBass/uMid/uTreble, so no gain sliders */
             { ParamIDs::rotationSpeed, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 30 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
+            /* 29 Stereo Field -- reads uStereoScope/uCorrelation directly, not uBass/uMid/uTreble */
             { ParamIDs::cameraScale, ParamIDs::palette },
-            /* 31 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
+            /* 30 Wispy Ribbons -- Zoom Speed repurposed as horizontal drift speed */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 32 Video Feedback -- Zoom Speed=Growth, Rotation Speed=Rotation,
+            /* 31 Video Feedback -- Zoom Speed=Growth, Rotation Speed=Rotation,
                Distortion=Direction, Feedback Amount=Blend (see the .frag header) */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::distortion, ParamIDs::feedbackAmount, ParamIDs::cameraShake, ParamIDs::cameraScale,
               ParamIDs::palette },
-            /* 33 Tri-Color Waves */
+            /* 32 Tri-Color Waves */
             { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion },
-            /* 34 Wave Sphere */
+            /* 33 Wave Sphere */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 35 Image Fragments */
+            /* 34 Image Fragments */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::distortion,
               ParamIDs::cameraScale, ParamIDs::palette },
-            /* 36 Image Feedback Zoom */
+            /* 35 Image Feedback Zoom */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::feedbackAmount,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 37 Ocean Floor -- deliberately not audio-reactive (see the .frag header);
+            /* 36 Ocean Floor -- deliberately not audio-reactive (see the .frag header);
                Zoom Speed repurposed as current drift speed */
             { ParamIDs::zoomSpeed, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 38 Water Ripples -- deliberately not audio-reactive (see the .frag header) */
+            /* 37 Water Ripples -- deliberately not audio-reactive (see the .frag header) */
             { ParamIDs::distortion, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 39 Jelly Polygons -- calm drifting now, no movement-based reactivity (Bass/Mid Gain no longer read) */
+            /* 38 Jelly Polygons -- calm drifting now, no movement-based reactivity (Bass/Mid Gain no longer read) */
             { ParamIDs::rotationSpeed, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 40 Goopy Slime */
+            /* 39 Goopy Slime -- calm lava-lamp pace now, audio only affects brightness/glint
+               (Bass/Mid Gain no longer read; Treble Gain still drives the specular) */
+            { ParamIDs::trebleGain, ParamIDs::rotationSpeed, ParamIDs::cameraShake, ParamIDs::cameraScale,
+              ParamIDs::palette },
+            /* 40 Bouncing Shapes -- fully 2D now, bounces off the actual screen edges and off each other */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 41 Bouncing Shapes -- fully 2D now, bounces off the actual screen edges and off each other */
-            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
-              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 42 2D Flames -- Zoom Speed repurposed as upward rise/flicker speed */
+            /* 41 2D Flames -- Zoom Speed repurposed as upward rise/flicker speed */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion,
               ParamIDs::palette },
-            /* 43 Energy Tunnel -- Zoom Speed=travel speed, Rotation Speed=spin around the tunnel axis */
+            /* 42 Energy Tunnel -- Zoom Speed=travel speed, Rotation Speed=spin around the tunnel axis */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 44 Terrain Flyover -- deliberately calm/not audio-reactive (see the .frag header);
+            /* 43 Terrain Flyover -- deliberately calm/not audio-reactive (see the .frag header);
                Zoom Speed=travel speed (manual, not reactivity) */
             { ParamIDs::zoomSpeed, ParamIDs::cameraScale, ParamIDs::palette },
         };
@@ -291,8 +288,7 @@ const std::vector<PresetCategory>& presetCategories()
     // categories here freely without ever touching the real APVTS index
     // any of them lives at.
     static const std::vector<PresetCategory> categories {
-        { "Fractal Dives", { "Mandelbrot Pulse", "Julia Kaleidoscope", "Burning Ship", "Apollonian Gasket",
-                              "Sierpinski Triforce" } },
+        { "Fractal Dives", { "Mandelbrot Pulse", "Julia Kaleidoscope", "Burning Ship", "Sierpinski Triforce" } },
         { "Fractal Explorers", { "Mandelbrot Explorer", "Burning Ship Explorer", "Perpendicular Ship",
                                   "Buffalo Fractal", "Tricorn" } },
         { "Fractal 3D", { "Burning Ship 3D", "Mandelbox", "Energy Tunnel" } },

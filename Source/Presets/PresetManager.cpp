@@ -48,10 +48,10 @@ namespace
         { BinaryData::water_ripples_frag,      BinaryData::water_ripples_fragSize },
         { BinaryData::jelly_polygons_frag,     BinaryData::jelly_polygons_fragSize },
         { BinaryData::goopy_slime_frag,        BinaryData::goopy_slime_fragSize },
-        { BinaryData::drippy_liquid_frag,      BinaryData::drippy_liquid_fragSize },
         { BinaryData::bouncing_shapes_frag,    BinaryData::bouncing_shapes_fragSize },
         { BinaryData::flames_2d_frag,          BinaryData::flames_2d_fragSize },
         { BinaryData::energy_tunnel_frag,      BinaryData::energy_tunnel_fragSize },
+        { BinaryData::terrain_flyover_frag,    BinaryData::terrain_flyover_fragSize },
     };
 
     constexpr int numPresets = (int) (sizeof(presetResources) / sizeof(Resource));

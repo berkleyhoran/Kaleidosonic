@@ -33,6 +33,11 @@ uniform float uZoomWander;       // 0..2, how far fractal zoom targets wander wh
 uniform float uCameraShake;      // 0..2, how hard onsets kick the camera/zoom
 uniform float uCameraScale;      // 0.2..6, manual zoom-out multiplier on top of everything else
 uniform float uPalette;          // 0..8, continuous -- selects/crossfades curated cosine-gradient palettes
+// Particle-preset controls (Particle Bloom / Starfield Warp / Fractal
+// Bubbles only) -- 0..2, default 1 reproduces each preset's original
+// fixed particle count/size exactly.
+uniform float uParticleDensity;
+uniform float uParticleSize;
 
 // CPU-computed (double-double, ~32 decimal digit precision) perturbation
 // reference orbit for Mandelbrot Pulse / Burning Ship -- see
@@ -545,16 +550,20 @@ vec3 exploreFractal(int variant, float ySign)
     uv.y *= ySign;
 
     // A gentle, always-on drift on top of the manual view -- Rotation
-    // Speed spins the frame slowly, Zoom Speed breathes it in and out,
+    // Speed sways the frame slowly, Zoom Speed breathes it in and out,
     // Distortion adds a slow fine wobble to the sample coordinate itself.
-    // Deliberately kept small (the header comment's "never moving the
-    // camera out from under the user" principle still holds for the
-    // actual pan/zoom, which stay 100% manual via FractalNavigator) --
-    // this only makes an otherwise perfectly static explorer view read as
-    // alive rather than a frozen screenshot, at an amplitude too slight to
-    // fight the mouse wheel/drag input building the real view radius/
-    // offset upstream.
-    uv = rotate2d(uTime * 0.015 * uRotationSpeed) * uv;
+    // The rotation term is a bounded back-and-forth OSCILLATION (sin of
+    // time), not an unbounded continuous spin -- an earlier version
+    // rotated by uTime * rate directly, which drifts arbitrarily far given
+    // enough time and, past a few degrees, makes on-screen drag no longer
+    // point where the fractal actually pans (the manual pan/zoom in
+    // FractalNavigator assumes screen-x/y map straight onto the fractal's
+    // re/im axes with no rotation term at all), reported as "mouse
+    // controls get rotated too, hard to control." Bounding the swing to
+    // +-0.05 rad (~3 degrees) keeps the view reading as alive while never
+    // drifting far enough to meaningfully fight the drag mapping.
+    float rotWobble = sin(uTime * 0.1) * 0.05 * uRotationSpeed;
+    uv = rotate2d(rotWobble) * uv;
     uv *= 1.0 + 0.03 * sin(uTime * 0.12 * (0.3 + abs(uZoomSpeed))) * (0.4 + abs(uZoomSpeed));
     uv += uDistortion * 0.006 * vec2(sin(uv.y * 9.0 + uTime * 0.6), cos(uv.x * 9.0 - uTime * 0.5));
 

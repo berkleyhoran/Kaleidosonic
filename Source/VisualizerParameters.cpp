@@ -39,6 +39,8 @@ Layout createParameterLayout()
     params.push_back(makeFloat(ParamIDs::eqLowGain, "EQ Low", -18.0f, 18.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::eqMidGain, "EQ Mid", -18.0f, 18.0f, 0.0f));
     params.push_back(makeFloat(ParamIDs::eqHighGain, "EQ High", -18.0f, 18.0f, 0.0f));
+    params.push_back(makeFloat(ParamIDs::particleDensity, "Particle Density", 0.0f, 2.0f, 1.0f));
+    params.push_back(makeFloat(ParamIDs::particleSize, "Particle Size", 0.0f, 2.0f, 1.0f));
     params.push_back(makeFloat(ParamIDs::zoomSpeed, "Zoom Speed", -1.0f, 1.0f, 0.3f));
     params.push_back(makeFloat(ParamIDs::rotationSpeed, "Rotation Speed", -1.0f, 1.0f, 0.2f));
     params.push_back(makeFloat(ParamIDs::hue, "Hue", 0.0f, 1.0f, 0.0f));
@@ -96,6 +98,9 @@ const std::vector<ParamGroupInfo>& paramGroups()
         // numbers. Its own group since it's a genuinely different kind of
         // control (dB, pre-analysis) from everything else here.
         { "Input EQ (Pre-Analysis)", { ParamIDs::eqLowGain, ParamIDs::eqMidGain, ParamIDs::eqHighGain } },
+        // Only relevant for the three particle-field presets (Particle
+        // Bloom, Starfield Warp, Fractal Bubbles) -- see conditionalRelevance.
+        { "Particles", { ParamIDs::particleDensity, ParamIDs::particleSize } },
         { "Motion & Zoom", { ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::cameraShake,
                               ParamIDs::cameraScale, ParamIDs::zoomWander } },
         { "Fractal Detail", { ParamIDs::iterations, ParamIDs::kaleidoscopeSegments, ParamIDs::distortion,
@@ -157,7 +162,8 @@ namespace
               ParamIDs::cameraShake, ParamIDs::cameraScale },
             /* 6  Particle Bloom */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
-              ParamIDs::kaleidoscopeSegments, ParamIDs::cameraScale },
+              ParamIDs::kaleidoscopeSegments, ParamIDs::cameraScale, ParamIDs::particleDensity,
+              ParamIDs::particleSize },
             /* 7  Oscilloscope Glow */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::kaleidoscopeSegments, ParamIDs::distortion },
@@ -168,10 +174,11 @@ namespace
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
             /* 10 Fractal Bubbles */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
-              ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale },
+              ParamIDs::zoomWander, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::particleDensity,
+              ParamIDs::particleSize },
             /* 11 Starfield Warp */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::zoomWander, ParamIDs::cameraShake,
-              ParamIDs::cameraScale },
+              ParamIDs::cameraScale, ParamIDs::particleDensity, ParamIDs::particleSize },
             /* 12 Mandelbox */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
               ParamIDs::iterations, ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
@@ -249,9 +256,9 @@ namespace
             /* 36 Image Feedback Zoom */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::feedbackAmount,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 37 Ocean Floor -- Zoom Speed repurposed as current drift speed */
-            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::cameraScale,
-              ParamIDs::palette },
+            /* 37 Ocean Floor -- deliberately not audio-reactive (see the .frag header);
+               Zoom Speed repurposed as current drift speed */
+            { ParamIDs::zoomSpeed, ParamIDs::cameraScale, ParamIDs::palette },
             /* 38 Water Ripples */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
               ParamIDs::palette },
@@ -261,17 +268,18 @@ namespace
             /* 40 Goopy Slime */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 41 Drippy Liquid -- fully 2D now, no rotation/camera-shake/treble reads */
-            { ParamIDs::bassGain, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 42 Bouncing Shapes -- fully 2D now, bounces off the actual screen edges and off each other */
+            /* 41 Bouncing Shapes -- fully 2D now, bounces off the actual screen edges and off each other */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 43 2D Flames -- Zoom Speed repurposed as upward rise/flicker speed */
+            /* 42 2D Flames -- Zoom Speed repurposed as upward rise/flicker speed */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::distortion,
               ParamIDs::palette },
-            /* 44 Energy Tunnel -- Zoom Speed=travel speed, Rotation Speed=spin around the tunnel axis */
+            /* 43 Energy Tunnel -- Zoom Speed=travel speed, Rotation Speed=spin around the tunnel axis */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::palette },
+            /* 44 Terrain Flyover -- Zoom Speed=travel speed, Rotation Speed=bank-into-turn amount */
+            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
+              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
         };
         return table;
     }
@@ -298,8 +306,8 @@ const std::vector<PresetCategory>& presetCategories()
                                       "Stereo Field", "Tri-Color Waves", "Wave Sphere" } },
         { "Image Reactive", { "Image Ripple", "Image Shatter", "Image Kaleidoscope", "Image Fragments",
                                "Image Feedback Zoom" } },
-        { "Environments", { "Ocean Floor", "Water Ripples" } },
-        { "Organic & Physics", { "Jelly Polygons", "Goopy Slime", "Drippy Liquid", "Bouncing Shapes" } },
+        { "Environments", { "Ocean Floor", "Water Ripples", "Terrain Flyover" } },
+        { "Organic & Physics", { "Jelly Polygons", "Goopy Slime", "Bouncing Shapes" } },
     };
     return categories;
 }
@@ -346,6 +354,8 @@ void VisualizerParameterRefs::resolve(juce::AudioProcessorValueTreeState& apvts)
     eqLowGain               = apvts.getRawParameterValue(ParamIDs::eqLowGain);
     eqMidGain                = apvts.getRawParameterValue(ParamIDs::eqMidGain);
     eqHighGain               = apvts.getRawParameterValue(ParamIDs::eqHighGain);
+    particleDensity          = apvts.getRawParameterValue(ParamIDs::particleDensity);
+    particleSize             = apvts.getRawParameterValue(ParamIDs::particleSize);
     zoomSpeed              = apvts.getRawParameterValue(ParamIDs::zoomSpeed);
     rotationSpeed          = apvts.getRawParameterValue(ParamIDs::rotationSpeed);
     hue                     = apvts.getRawParameterValue(ParamIDs::hue);

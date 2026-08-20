@@ -31,7 +31,12 @@ void main()
     uv /= max(uCameraScale, 0.05);
 
     float react = uReactivity;
-    float squash = 1.0 + uBass * react * 0.35;
+    // Kept gentle and applied once -- an earlier version divided BOTH each
+    // jelly's radius AND the sampling coordinate by this same bass-driven
+    // squash (a compounding effect) at a large enough multiplier that
+    // fast bass envelope moves read as the whole field jittering rather
+    // than breathing. Single application, smaller amount, fixes both.
+    float squash = 1.0 + uBass * react * 0.12;
 
     float field = 1.0e5;
     float nearestIdx = 0.0;
@@ -41,10 +46,10 @@ void main()
         float speed = mix(0.06, 0.18, hashJ(seed)) * (0.5 + uMid * react * 0.6);
         vec2 center = vec2(sin(uTime * speed + seed), cos(uTime * speed * 0.8 + seed * 1.7))
                     * mix(0.5, 1.3, hashJ(seed + 5.0));
-        float radius = mix(0.28, 0.55, hashJ(seed + 9.0)) / squash;
+        float radius = mix(0.28, 0.55, hashJ(seed + 9.0));
         float sides = floor(mix(3.0, 7.0, hashJ(seed + 13.0)));
         float rot = uTime * (0.1 + hashJ(seed + 17.0) * 0.3) * (0.4 + abs(uRotationSpeed)) + seed;
-        float wobble = (0.02 + uOnset * react * 0.05) * radius;
+        float wobble = (0.015 + uOnset * react * 0.03) * radius;
 
         vec2 p = uv - center;
         p.y /= squash; // bass squashes every jelly vertically, like it's bouncing under its own weight

@@ -6,6 +6,15 @@
 // look comes from overlapping warped sine fields, the same cheap trick
 // real-time caustic effects have used for decades, so cost stays flat
 // regardless of any other setting.
+//
+// Deliberately NOT audio-reactive (an explicit user call after trying it
+// live) -- earlier drafts drove the caustic sparkle's contrast *power*
+// (not just its brightness) off treble, which changed the actual texture/
+// character of the pattern moment to moment rather than reading as a
+// normal pulse, and came across as "weird" rather than musical. This is
+// meant to be an ambient, slowly-animating scene the audio sits over, not
+// something that visibly reacts to it -- same idea as a still photograph
+// preset, just in motion on its own clock.
 
 float hashOF(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -35,7 +44,6 @@ void main()
     vec2 uv = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
     uv /= max(uCameraScale, 0.05);
 
-    float react = uReactivity;
     float t = uTime;
 
     // Slow current drift -- Zoom Speed repurposed as drift speed, the same
@@ -63,18 +71,15 @@ void main()
     // Caustic light net: two layers at different scale/speed multiplied
     // together (the standard caustic trick -- bright only where both
     // layers happen to peak together, giving the characteristic net/mesh
-    // look). Bass swells amplitude (a heavier "wave overhead"), treble
-    // sharpens the sparkle via a steeper contrast power.
-    float amp = 1.0 + uBass * react * 0.8;
-    float c1 = causticLayer(sandUV, t, 5.0, 0.6) * amp;
-    float c2 = causticLayer(sandUV * 1.7 + 3.1, t, 8.0, -0.8) * amp;
+    // look). Fixed amplitude/contrast -- not audio-driven, see header.
+    float c1 = causticLayer(sandUV, t, 5.0, 0.6);
+    float c2 = causticLayer(sandUV * 1.7 + 3.1, t, 8.0, -0.8);
     float caustic = max(c1, 0.0) * max(c2, 0.0);
-    float sparklePow = mix(1.5, 4.0, clamp(uTreble * react, 0.0, 1.0));
-    caustic = pow(clamp(caustic * 1.6, 0.0, 1.0), sparklePow);
+    caustic = pow(clamp(caustic * 1.6, 0.0, 1.0), 2.4);
 
     vec3 lightCol = palette(ridgeShade * 0.3 + t * 0.01, uHue) * 0.35 + vec3(0.45, 0.85, 0.95) * 0.65;
     vec3 col = sandCol;
-    col += lightCol * caustic * (0.8 + uLevel * react * 1.2);
+    col += lightCol * caustic * 1.1;
 
     // God rays: a few slow diagonal light shafts descending from the top
     // of frame, brightest where they cross open sand -- the single
@@ -88,10 +93,10 @@ void main()
         float shaft = smoothstep(0.16, 0.0, abs(shaftUvX));
         rays += shaft * (0.5 + 0.5 * sin(uv.y * 3.0 - t * 0.4 + ri));
     }
-    col += vec3(0.5, 0.8, 0.85) * rays * 0.16 * (0.6 + uLevel * react * 0.5);
+    col += vec3(0.5, 0.8, 0.85) * rays * 0.16 * 0.85;
 
     // Seaweed: a sparse row of strands rooted in the sand, swaying in the
-    // current, bending harder with treble.
+    // current.
     float weedCellW = 0.5;
     float weedX = uv.x / weedCellW;
     float weedId = floor(weedX);
@@ -101,24 +106,20 @@ void main()
     {
         float weedHeight = mix(0.25, 0.55, hashOF(weedSeed));
         float weedRootY = mix(-0.9, -0.5, hashOF(weedSeed + 6.0)) / max(uCameraScale, 0.05);
-        float weedSway = sin(t * (0.5 + uTreble * react * 1.5) + weedSeed * 3.0) * (0.05 + uTreble * react * 0.08);
+        float weedSway = sin(t * 0.7 + weedSeed * 3.0) * 0.07;
         vec2 weedLocal = vec2(weedLocalX, uv.y - weedRootY);
         float weedCov = weedCoverage(weedLocal, weedSway, weedHeight);
-        vec3 weedCol = vec3(0.10, 0.30, 0.16) * (0.7 + uLevel * react * 0.4);
+        vec3 weedCol = vec3(0.10, 0.30, 0.16) * 0.85;
         col = mix(col, weedCol, weedCov);
     }
 
-    // Onset: a bright ripple ring expanding from center, like something
-    // just broke the surface overhead.
     float dist = length(uv);
-    float ring = smoothstep(0.03, 0.0, abs(dist - uOnset * react * 1.6)) * uOnset * react;
-    col += ring * vec3(0.7, 0.9, 1.0) * 0.6;
 
     // Strong, unambiguously blue depth tint and vignette toward the edges
     // -- makes the "peering down into open ocean water" read unmistakable
     // rather than a subtle abstract-pattern one.
     col = mix(col, col * vec3(0.28, 0.55, 0.82), 0.62);
-    col += vec3(0.02, 0.06, 0.14) * (0.4 + uLevel * react * 0.3);
+    col += vec3(0.02, 0.06, 0.14) * 0.55;
     col *= 1.0 - smoothstep(0.45, 1.3, dist) * 0.65;
 
     fragColor = vec4(grade(col), 1.0);

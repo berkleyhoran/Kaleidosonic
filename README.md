@@ -217,13 +217,13 @@ Audio passes through completely unmodified — this is a pure visualizer.
     own edge and the whole field squashing vertically on bass. Fully 2D,
     no raymarch.
   - **Goopy Slime** — a single continuous mass of viscous goo: a few big
-    lobes smooth-min merged into one oozing body that bulges with the
-    bass, finished with a hard, glossy specular highlight for a wet-surface
-    read distinct from Metaballs' softer plastic finish.
-  - **Drippy Liquid** — drips hanging from an unseen ceiling, each on its
-    own independent cycle: elongating, releasing as a droplet that falls
-    under gravity-like ease, and splashing where it lands, before
-    repeating. Bass speeds up the whole cycle.
+    lobes smooth-min merged into one oozing body that bulges with the bass.
+    Three things make it genuinely different from Metaballs rather than a
+    reskin: a rolling sine-noise bump field perturbs the surface itself
+    for a boiling/lumpy read instead of Metaballs' clean spherical fusion,
+    a few thin tapering strands actually droop off the underside of the
+    mass down onto a floor below it (real dripping, not just an orbiting
+    blob), and a hard, tight specular highlight for a wet-surface finish.
   - **Bouncing Shapes** — circles, rounded squares, and triangles that
     genuinely bounce off the screen's actual edges *and* off each other,
     via a real CPU-side elastic-collision simulation
@@ -249,6 +249,25 @@ Audio passes through completely unmodified — this is a pure visualizer.
     flight tube carved out of the middle via CSG subtraction so the
     camera always has a clear path while fractal detail radiates as walls
     all around it.
+  - **Terrain Flyover** — an infinite hilly landscape flown over from a
+    bird's-eye vantage: layered value noise (a cheap Perlin-style FBM
+    height field) raymarched as a heightfield via the standard "vertical
+    gap times a slope-safety factor" distance approximation. Since the
+    terrain is a pure function of world (x, z), flying "infinitely" costs
+    nothing extra. The camera's own altitude tracks a much lower-frequency
+    version of the same height field (the broad landscape trend only, no
+    ridge/fine detail) rather than the full detailed terrain directly
+    underneath it, so it cruises smoothly over hills instead of bobbing
+    over every individual bump. Bass swells hill height, treble adds fine
+    ridge detail, and the flight path gently curves and banks into its
+    own turns.
+- **Particle Density / Particle Size** (0–2 each, default 1 = each
+  preset's original look) for the three particle-field presets (Particle
+  Bloom, Starfield Warp, Fractal Bubbles): Density scales how many of a
+  fixed compiled-in maximum are actually drawn each frame (GLSL loop
+  bounds have to stay compile-time constants, so this is an early-break
+  pattern, not a literal dynamic-length loop), Size scales each individual
+  particle.
 - **Real pre-analysis EQ** (`EQ Low`/`EQ Mid`/`EQ High`, ±18dB, in a
   dedicated "Input EQ (Pre-Analysis)" parameter group): a genuine 3-band
   shelf/peak filter applied to a filtered *copy* of the incoming signal
@@ -274,7 +293,7 @@ Audio passes through completely unmodified — this is a pure visualizer.
   pre-downmix plus a 1024-sample L/R scope ring buffer (Stereo Field), and
   **auto-gain** normalization so reactivity tracks the *dynamics* of
   whatever's playing instead of absolute loudness.
-- **49 automatable parameters**, including a **Palette** parameter (0–8)
+- **51 automatable parameters**, including a **Palette** parameter (0–8)
   that sweeps/crossfades through curated cosine-gradient palettes
   (Spectrum, Fire, Ice, Synthwave, Sunset, Forest, Mono, Psychedelic) on
   top of the Hue knob, plus eighteen global post-FX (Trails, Blur, Noise,
@@ -402,8 +421,8 @@ Shaders/
   wispy_ribbons.frag             video_feedback.frag     tri_color_waves.frag
   wave_sphere.frag               image_fragments.frag    image_feedback_zoom.frag
   ocean_floor.frag                water_ripples.frag      jelly_polygons.frag
-  goopy_slime.frag                 drippy_liquid.frag      bouncing_shapes.frag
-  flames_2d.frag                    energy_tunnel.frag
+  goopy_slime.frag                 bouncing_shapes.frag    flames_2d.frag
+  energy_tunnel.frag                 terrain_flyover.frag
 ```
 
 The renderer pipeline is two stages: Layer A (and Layer B too, whenever
@@ -499,6 +518,7 @@ first launch -- expected for now, not a broken build.
 | Reactivity | 0–2 | Global multiplier on audio-driven color/brightness response |
 | Bass / Mid / Treble Gain | 0–2 each | Per-band weighting after analysis, before it hits the shaders |
 | EQ Low / Mid / High | ±18dB each | Real pre-analysis EQ — reshapes the signal itself before FFT/band analysis; output to the DAW is untouched either way |
+| Particle Density / Size | 0–2 each | Particle count/size for Particle Bloom, Starfield Warp, Fractal Bubbles (default 1 = original look) |
 | Zoom Speed | -1–1 | Fractal zoom/travel rate (autopilot presets) |
 | Rotation Speed | -1–1 | Rotation rate |
 | Hue | 0–1 | Base color hue (phase offset within the palette) |

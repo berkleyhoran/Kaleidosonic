@@ -59,7 +59,7 @@ void main()
     // Bass makes the flame body roar taller; Zoom Speed repurposed as the
     // flame's own upward rise/flicker pace -- same "generic knob -> this
     // preset's own concept" convention other presets already use.
-    float flameHeight = 0.55 + uBass * react * 0.5;
+    float flameHeight = 0.85 + uBass * react * 0.6;
     float scrollSpeed = 0.35 + 0.5 * abs(uZoomSpeed);
     vec2 p = vec2(uv.x * 2.2, uv.y * 1.6 - uTime * scrollSpeed);
 
@@ -71,17 +71,22 @@ void main()
     // Vertical falloff: dense/bright at the bottom, tapering to nothing
     // near flameHeight -- what shapes this into flame silhouettes rather
     // than a flat noise field. Also narrows horizontally with height,
-    // like a real flame licking to a point.
-    float heightUv = (uv.y + 0.9) / max(flameHeight, 0.05);
+    // like a real flame licking to a point. Ground reference is -0.5, the
+    // *actual* bottom of the aspect-corrected uv space (only uv.x scales
+    // by aspect ratio -- uv.y always spans exactly -0.5..0.5, never -0.9)
+    // -- an earlier version measured from -0.9, which put the entire
+    // visible frame already most of the way up the taper curve, so the
+    // flame barely showed at all regardless of any other setting.
+    float heightUv = (uv.y + 0.5) / max(flameHeight, 0.05);
     float taper = 1.0 - smoothstep(0.0, 1.0, heightUv);
     float widthNarrow = mix(1.0, 2.6, clamp(heightUv, 0.0, 1.0));
     float horizFalloff = smoothstep(0.9, 0.1, abs(uv.x) * widthNarrow);
 
     float body = density * taper * horizFalloff;
-    body = smoothstep(0.15, 0.75, body);
+    body = smoothstep(0.08, 0.6, body);
 
-    vec3 col = fireRamp(body * (0.6 + uLevel * react * 0.5), uHue);
-    col *= body;
+    vec3 col = fireRamp(body * (0.75 + uLevel * react * 0.5), uHue);
+    col *= body * 1.3;
 
     // Embers: a handful of small bright points launching off the flame
     // body and rising/drifting, each on its own independent cycle -- a
@@ -94,7 +99,7 @@ void main()
         float cycle = fract(uTime / period + hash1F(seed + 1.7));
         float driftX = (hash1F(seed + 3.1) - 0.5) * 0.9;
         float emberX = driftX * cycle + sin(uTime * 2.0 + seed) * 0.02;
-        float emberY = -0.85 + cycle * (flameHeight + 0.35);
+        float emberY = -0.5 + cycle * (flameHeight + 0.35);
         float d = length(uv - vec2(emberX, emberY));
         float glow = smoothstep(0.018, 0.0, d) * (1.0 - cycle) * (0.5 + uOnset * react * 1.2);
         col += fireRamp(0.95, uHue) * glow;
@@ -102,7 +107,7 @@ void main()
 
     // Heat-shimmer glow around the body, and a warm floor glow at the
     // very base so the flame doesn't look like it's floating.
-    col += fireRamp(0.7, uHue) * smoothstep(0.4, 0.0, length(uv - vec2(0.0, -0.85))) * 0.15;
+    col += fireRamp(0.7, uHue) * smoothstep(0.5, 0.0, length(uv - vec2(0.0, -0.5))) * 0.2;
 
     fragColor = vec4(grade(col), 1.0);
 }

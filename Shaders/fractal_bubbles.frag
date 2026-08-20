@@ -5,6 +5,11 @@
 // When an image (or GIF) is loaded, each bubble is tinted by the picture
 // at its own base (pre-drift) position -- like the photo is floating
 // behind the bubble field and each bubble is a little lens onto it.
+//
+// Particle Density/Size (uParticleDensity/uParticleSize) scale the bubble
+// count/size -- see Particle Bloom's header comment for why the loop
+// bound stays a fixed compile-time constant with an early break instead.
+// Default Density=1 reproduces the original 40-bubble look exactly.
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -31,9 +36,12 @@ void main()
 
     vec3 col = vec3(0.02, 0.02, 0.05);
 
-    const int numBubbles = 40;
-    for (int i = 0; i < numBubbles; ++i)
+    const int kNumBubblesMax = 80;
+    int activeBubbles = int(float(kNumBubblesMax) * clamp(uParticleDensity, 0.0, 2.0) * 0.5 + 0.5);
+    for (int i = 0; i < kNumBubblesMax; ++i)
     {
+        if (i >= activeBubbles)
+            break;
         float seed = float(i) * 7.0 + 1.0;
         vec2 base = sierpinskiPoint(seed) * 0.85;
 
@@ -46,7 +54,7 @@ void main()
                  + vec2(drift, cos(uTime * speed * 0.7 + seed) * 0.12);
         pos *= 1.0 + uZoomWander * 0.15 * sin(uTime * 0.11 + seed);
 
-        float size = mix(0.018, 0.075, depth) * (1.0 + uOnset * react * uCameraShake * 1.0);
+        float size = mix(0.018, 0.075, depth) * (1.0 + uOnset * react * uCameraShake * 1.0) * uParticleSize;
         float d = length(uv - pos);
 
         float bubble = smoothstep(size, size * 0.35, d);

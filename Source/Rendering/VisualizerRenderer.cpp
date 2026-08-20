@@ -489,6 +489,8 @@ VisualizerRenderer::CommonUniforms::CommonUniforms(juce::OpenGLShaderProgram& pr
     stereoWidth             = makeUniformIfPresent(program, "uStereoWidth");
     correlation             = makeUniformIfPresent(program, "uCorrelation");
     bounceState             = makeUniformIfPresent(program, "uBounceState");
+    particleDensity         = makeUniformIfPresent(program, "uParticleDensity");
+    particleSize            = makeUniformIfPresent(program, "uParticleSize");
 }
 
 VisualizerRenderer::BlitUniforms::BlitUniforms(juce::OpenGLShaderProgram& program)
@@ -1216,6 +1218,8 @@ void VisualizerRenderer::setCommonUniforms(CommonUniforms& u, GLuint prevFrameTe
     const float cameraScaleValue = params.cameraScale != nullptr ? params.cameraScale->load() : 1.0f;
     setU(u.cameraScale, cameraScaleValue);
     setU(u.palette, params.palette != nullptr ? params.palette->load() : 0.0f);
+    setU(u.particleDensity, params.particleDensity != nullptr ? params.particleDensity->load() : 1.0f);
+    setU(u.particleSize, params.particleSize != nullptr ? params.particleSize->load() : 1.0f);
 
     float ifsZoomHi = 0.0f, ifsZoomLo = 0.0f;
     ddToFloatPair(ddFromDouble(ifsZoomScale), ifsZoomHi, ifsZoomLo);

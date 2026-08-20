@@ -73,7 +73,8 @@ private:
             feedback, iterations, distortion, zoomWander, cameraShake, cameraScale, palette, prevFrame, waveform,
             fractalOrbit, fractalOrbitLength, fractalRadius, fractalFade, fractalRefOffset, fractalIterNeed,
             ifsZoomScale, ifsFade, zoomPhase, userImage, userImageAspect, userImageLoaded,
-            mazePos, mazeHeading, spectrum, stereoScope, stereoWidth, correlation, bounceState;
+            mazePos, mazeHeading, spectrum, stereoScope, stereoWidth, correlation, bounceState,
+            particleDensity, particleSize;
     };
 
     struct CompiledPreset

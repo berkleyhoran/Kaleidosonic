@@ -5,6 +5,11 @@
 // that star's fixed launch direction instead of the hue sweep -- since
 // the direction (not the animated depth) is what stays constant per
 // star, it reads as flying through the photo itself.
+//
+// Particle Density/Size (uParticleDensity/uParticleSize) scale the star
+// count/size -- see Particle Bloom's header comment for why the loop
+// bound stays a fixed compile-time constant with an early break instead.
+// Default Density=1 reproduces the original 90-star look exactly.
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -20,9 +25,12 @@ void main()
 
     vec3 col = vec3(0.0);
 
-    const int numStars = 90;
-    for (int i = 0; i < numStars; ++i)
+    const int kNumStarsMax = 180;
+    int activeStars = int(float(kNumStarsMax) * clamp(uParticleDensity, 0.0, 2.0) * 0.5 + 0.5);
+    for (int i = 0; i < kNumStarsMax; ++i)
     {
+        if (i >= activeStars)
+            break;
         float seed = float(i) * 13.7 + 1.0;
         float angle = hash1(seed) * 6.2831853 + uZoomWander * 0.3 * sin(uTime * 0.05 + seed);
         float radiusSeed = hash1(seed + 91.0);
@@ -31,7 +39,7 @@ void main()
         vec2 dir = vec2(cos(angle), sin(angle));
         vec2 pos = dir * (1.0 / z) * 0.5;
 
-        float size = (0.004 + 0.012 / z) * (1.0 + uOnset * react * 1.6);
+        float size = (0.004 + 0.012 / z) * (1.0 + uOnset * react * 1.6) * uParticleSize;
         float d = length(uv - pos);
         float star = size / (d + size * 0.3) - 1.0;
         star = max(star, 0.0);

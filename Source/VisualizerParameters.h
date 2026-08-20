@@ -31,6 +31,16 @@ namespace ParamIDs
     static const juce::String eqLowGain              { "eqLowGain" };
     static const juce::String eqMidGain              { "eqMidGain" };
     static const juce::String eqHighGain             { "eqHighGain" };
+
+    // Particle-preset controls (Particle Bloom / Starfield Warp / Fractal
+    // Bubbles): 0..2, default 1 -- 1 reproduces each preset's original
+    // fixed particle count/size exactly, so existing automation/saved
+    // projects see no change at default. Density scales how many of each
+    // preset's compiled-in maximum are actually drawn (see each .frag's
+    // own comment for why the loop bound itself has to stay a fixed
+    // compile-time constant); Size scales each individual particle.
+    static const juce::String particleDensity        { "particleDensity" };
+    static const juce::String particleSize           { "particleSize" };
     static const juce::String zoomSpeed              { "zoomSpeed" };
     static const juce::String rotationSpeed          { "rotationSpeed" };
     static const juce::String hue                    { "hue" };
@@ -143,10 +153,10 @@ namespace PresetNames
         "Water Ripples",
         "Jelly Polygons",
         "Goopy Slime",
-        "Drippy Liquid",
         "Bouncing Shapes",
         "2D Flames",
-        "Energy Tunnel"
+        "Energy Tunnel",
+        "Terrain Flyover"
     };
 }
 
@@ -202,6 +212,8 @@ struct VisualizerParameterRefs
     std::atomic<float>* eqLowGain          = nullptr;
     std::atomic<float>* eqMidGain          = nullptr;
     std::atomic<float>* eqHighGain         = nullptr;
+    std::atomic<float>* particleDensity    = nullptr;
+    std::atomic<float>* particleSize       = nullptr;
     std::atomic<float>* zoomSpeed          = nullptr;
     std::atomic<float>* rotationSpeed      = nullptr;
     std::atomic<float>* hue                = nullptr;

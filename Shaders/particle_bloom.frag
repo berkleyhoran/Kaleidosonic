@@ -6,6 +6,16 @@
 // own orbit position instead of the procedural hue sweep -- particles
 // outside the picture's bounds (or with no image loaded at all) still
 // fall back to the hue sweep, so it degrades gracefully either way.
+//
+// Particle Density/Size (uParticleDensity/uParticleSize) let this scale
+// beyond the original fixed count/size. The loop bound itself has to stay
+// a fixed compile-time constant (GLSL requirement) -- kNumParticlesMax is
+// the real ceiling, and Density (0..2, default 1) picks how many of those
+// are actually drawn each frame via an early break, the same pattern
+// Water Ripples' drop density already established. Default Density=1
+// reproduces the original 44-particle look exactly (kNumParticlesMax is
+// double that specifically so Density has headroom to go both below and
+// above the original count).
 
 float hash1(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -18,9 +28,12 @@ void main()
     float react = uReactivity;
     vec3 col = vec3(0.015, 0.01, 0.03);
 
-    const int numParticles = 44;
-    for (int i = 0; i < numParticles; ++i)
+    const int kNumParticlesMax = 88;
+    int activeParticles = int(float(kNumParticlesMax) * clamp(uParticleDensity, 0.0, 2.0) * 0.5 + 0.5);
+    for (int i = 0; i < kNumParticlesMax; ++i)
     {
+        if (i >= activeParticles)
+            break;
         float seed = float(i);
         float angle0 = hash1(seed) * 6.28318530718;
         float speed = mix(0.15, 0.6, hash1(seed + 11.0)) * (0.4 + uMid * react * 2.0);
@@ -33,7 +46,7 @@ void main()
         vec2 pos = radius * vec2(cos(angle), sin(angle));
 
         float baseSize = mix(0.006, 0.02, hash1(seed + 44.0));
-        float size = baseSize * (1.0 + uOnset * react * 5.0 + uLevel * react * 2.0);
+        float size = baseSize * (1.0 + uOnset * react * 5.0 + uLevel * react * 2.0) * uParticleSize;
 
         float d = length(uv - pos);
         float g = size / (d * d / size + size);

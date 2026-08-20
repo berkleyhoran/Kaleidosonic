@@ -259,9 +259,8 @@ namespace
             /* 37 Ocean Floor -- deliberately not audio-reactive (see the .frag header);
                Zoom Speed repurposed as current drift speed */
             { ParamIDs::zoomSpeed, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 38 Water Ripples */
-            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::distortion, ParamIDs::cameraScale,
-              ParamIDs::palette },
+            /* 38 Water Ripples -- deliberately not audio-reactive (see the .frag header) */
+            { ParamIDs::distortion, ParamIDs::cameraScale, ParamIDs::palette },
             /* 39 Jelly Polygons */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraScale,
               ParamIDs::palette },
@@ -277,9 +276,9 @@ namespace
             /* 43 Energy Tunnel -- Zoom Speed=travel speed, Rotation Speed=spin around the tunnel axis */
             { ParamIDs::bassGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::iterations,
               ParamIDs::cameraShake, ParamIDs::palette },
-            /* 44 Terrain Flyover -- Zoom Speed=travel speed, Rotation Speed=bank-into-turn amount */
-            { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
-              ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },
+            /* 44 Terrain Flyover -- deliberately calm/not audio-reactive (see the .frag header);
+               Zoom Speed=travel speed (manual, not reactivity) */
+            { ParamIDs::zoomSpeed, ParamIDs::cameraScale, ParamIDs::palette },
         };
         return table;
     }

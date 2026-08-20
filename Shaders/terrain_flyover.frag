@@ -7,10 +7,17 @@
 // slopes. Since the terrain is a pure function of world (x, z), flying
 // "infinitely" costs nothing extra -- there's no domain-repeat wall to
 // hit the way a repeated-cell tunnel would need, the camera just keeps
-// sampling noise further and further along its path. Bass swells hill
-// height, treble adds fine ridge detail, and onsets flash light breaking
-// through the haze. Camera path gently curves and banks into its own
-// turns, following the terrain's own contour for altitude.
+// sampling noise further and further along its path.
+//
+// Deliberately calm and NOT audio-reactive (an explicit user call, same
+// treatment as Ocean Floor/Water Ripples): straight-line, level flight at
+// a fixed altitude, constant hill/ridge shaping, no bass/treble/onset
+// terms anywhere. Earlier versions curved the path, banked into turns,
+// and tracked the ground's own contour for altitude -- all of that read
+// as "wiggling" and "annoying auto camera adjustments" rather than a calm
+// flyover, so this version only moves in one straight direction at one
+// constant height. Zoom Speed (a manual control, not reactivity) still
+// sets how fast it travels.
 
 float hashTF(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
 
@@ -39,74 +46,41 @@ float fbmTF(vec2 p)
     return sum;
 }
 
-float terrainHeight(vec2 xz, float react)
+float terrainHeight(vec2 xz)
 {
-    float hillHeight = 1.2 + uBass * react * 0.9;
+    float hillHeight = 1.6;
     float base = fbmTF(xz * 0.15);
     float ridge = fbmTF(xz * 0.5 + 5.0);
-    float fine = vnoiseTF(xz * 2.0) * (0.06 + uTreble * react * 0.12);
+    float fine = vnoiseTF(xz * 2.0) * 0.08;
     return (base * 1.6 + ridge * 0.5 - 0.9) * hillHeight + fine;
 }
 
-float terrainDE(vec3 p, float react)
+float terrainDE(vec3 p)
 {
     // The 0.45 fudge factor is the "slope safety" -- a heightfield's real
     // distance to the nearest surface point is less than the vertical gap
     // wherever the terrain is sloped, so under-estimating by this much
     // keeps the march from ever stepping through a steep hillside.
-    return (p.y - terrainHeight(p.xz, react)) * 0.45;
-}
-
-// A much lower-frequency, single-octave version of the same height field
-// -- the broad landscape trend only, none of the ridge/fine detail --
-// used purely as the camera's own altitude reference (see main()). Flying
-// at a fixed clearance above the *detailed* terrain made the camera bob
-// up and down over every individual hillock, reported as "the camera
-// shifts down and up" instead of a smooth fly; cruising a fixed clearance
-// above this coarse trend instead still rises over mountains and dips
-// into valleys at a large scale, but doesn't react to small bumps.
-float terrainHeightCoarse(vec2 xz, float react)
-{
-    float hillHeight = 1.2 + uBass * react * 0.9;
-    float base = fbmTF(xz * 0.035);
-    return (base * 1.6 - 0.8) * hillHeight;
+    return (p.y - terrainHeight(p.xz)) * 0.45;
 }
 
 void main()
 {
     vec2 uv = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
-    float react = uReactivity;
 
-    // Forward travel speed -- Zoom Speed sets the pace, bass/onset give a
-    // kinetic kick (Camera Shake gated, the usual convention every other
-    // flythrough preset here follows).
-    float speed = 3.0 + 6.0 * clamp(uZoomSpeed, 0.0, 1.0) + uBass * react * uCameraShake * 2.5;
+    // Straight-line, level flight -- Zoom Speed (manual) sets the pace,
+    // nothing audio-driven touches the path or the camera at all. Fixed
+    // altitude (not terrain-following) so there is genuinely zero
+    // vertical motion beyond what the pilot's own forward view naturally
+    // shows -- Camera Scale still lets it fly closer/further from the
+    // ground overall.
+    float speed = 3.0 + 6.0 * clamp(uZoomSpeed, 0.0, 1.0);
     float travel = uTime * speed;
 
-    // A gentle S-curving path (not a straight line) -- wander is a slow
-    // sine in X as a function of travel distance, so the flight visibly
-    // banks left and right over time instead of drilling dead straight.
-    float pathX = sin(travel * 0.025) * 6.0;
-    vec3 ro = vec3(pathX, 0.0, travel);
-    ro.y = terrainHeightCoarse(ro.xz, react) + (4.0 / max(uCameraScale, 0.05));
-
-    // Look a little ahead along the same path for the forward direction,
-    // banking the camera's roll into the turn based on the path's own
-    // curvature -- Rotation Speed scales how hard it banks. Same coarse
-    // height reference as the camera itself, so pitch stays level too.
-    float aheadTravel = travel + 6.0;
-    float aheadX = sin(aheadTravel * 0.025) * 6.0;
-    vec3 lookAt = vec3(aheadX, 0.0, aheadTravel);
-    lookAt.y = terrainHeightCoarse(lookAt.xz, react) + (3.4 / max(uCameraScale, 0.05));
-
-    vec3 forward = normalize(lookAt - ro);
-    vec3 worldUp = vec3(0.0, 1.0, 0.0);
-    vec3 right = normalize(cross(worldUp, forward));
-    vec3 up = cross(forward, right);
-
-    float bank = (pathX - sin((travel - 2.0) * 0.025) * 6.0) * 0.05 * (0.5 + abs(uRotationSpeed));
-    right = normalize(right + up * bank);
-    up = normalize(cross(forward, right));
+    vec3 ro = vec3(0.0, 5.0 / max(uCameraScale, 0.05), travel);
+    vec3 forward = vec3(0.0, 0.0, 1.0);
+    vec3 right = vec3(1.0, 0.0, 0.0);
+    vec3 up = vec3(0.0, 1.0, 0.0);
 
     vec3 rd = normalize(forward * 1.7 + right * uv.x + up * uv.y);
 
@@ -116,7 +90,7 @@ void main()
     for (int i = 0; i < 110; ++i)
     {
         p = ro + rd * t;
-        float d = terrainDE(p, react);
+        float d = terrainDE(p);
         if (d < 0.01 + t * 0.0006)
         {
             hit = true;
@@ -127,28 +101,25 @@ void main()
             break;
     }
 
-    // Sky: a palette-driven gradient with a bright band near the horizon,
-    // plus an onset light-flash breaking through.
+    // Sky: a palette-driven gradient with a bright band near the horizon.
     float skyT = clamp(uv.y * 0.7 + 0.35 - rd.y * 0.5, 0.0, 1.0);
     vec3 sky = mix(palette(0.55 + uTime * 0.004, uHue) * 0.55, palette(0.05 + uTime * 0.004, uHue) * 1.0, skyT);
-    sky += uOnset * react * 0.4 * vec3(0.9, 0.9, 1.0);
 
     vec3 col = sky;
     if (hit)
     {
         vec2 e = vec2(0.05, 0.0);
         vec3 n = normalize(vec3(
-            terrainDE(p + e.xyy, react) - terrainDE(p - e.xyy, react),
-            terrainDE(p + e.yxy, react) - terrainDE(p - e.yxy, react),
-            terrainDE(p + e.yyx, react) - terrainDE(p - e.yyx, react)));
+            terrainDE(p + e.xyy) - terrainDE(p - e.xyy),
+            terrainDE(p + e.yxy) - terrainDE(p - e.yxy),
+            terrainDE(p + e.yyx) - terrainDE(p - e.yyx)));
 
         vec3 lightDir = normalize(vec3(0.4, 0.7, -0.4));
         float diff = max(dot(n, lightDir), 0.0);
 
         // Height-banded terrain color: low = deep green, mid = lighter
         // green/olive, high = rocky grey, tinted a little by the palette
-        // for audio-reactive color variety without losing the "hills"
-        // read entirely.
+        // for color variety without losing the "hills" read entirely.
         float heightT = clamp((p.y - ro.y + 3.0) / 6.0, 0.0, 1.0);
         vec3 low = vec3(0.08, 0.22, 0.08);
         vec3 mid = vec3(0.20, 0.34, 0.12);
@@ -164,15 +135,6 @@ void main()
         float fog = smoothstep(30.0, 220.0, t);
         col = mix(col, sky, fog);
     }
-    else
-    {
-        // Never hit terrain (looking up into open sky) -- fade slightly
-        // toward the horizon band for a touch more atmosphere.
-        col = sky;
-    }
-
-    col *= 0.9 + uLevel * react * 0.25;
-    col += uOnset * react * uCameraShake * 0.08 * vec3(0.8, 0.85, 1.0);
 
     fragColor = vec4(grade(col), 1.0);
 }

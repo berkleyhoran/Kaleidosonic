@@ -1,10 +1,15 @@
 // Jelly Polygons — the whole screen filled with soft, squishy N-gon
-// "jelly" shapes drifting past and squashing into each other via a
-// smooth-min blend, each one wobbling at its own edge like real jelly
-// under its own weight, and the whole field squashing vertically on bass.
-// Fully 2D (screen-space SDFs, no raymarch) so cost stays flat regardless
-// of Iterations -- one composited field, evaluated once per pixel across
-// every shape.
+// "jelly" shapes drifting calmly past and squashing into each other via a
+// smooth-min blend, each one wobbling gently at its own edge like real
+// jelly. Fully 2D (screen-space SDFs, no raymarch) so cost stays flat
+// regardless of Iterations -- one composited field, evaluated once per
+// pixel across every shape.
+//
+// Deliberately no movement-based audio reactivity (an explicit user call
+// after two rounds of dialing the bass-driven squash down still read as
+// jittery rather than calm) -- drift speed, wobble, and squash are all
+// fixed/time-driven now, not modulated by bass/mid/onset at all. Only the
+// final color brightness pulse still responds to level/onset.
 
 float hashJ(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -31,30 +36,21 @@ void main()
     uv /= max(uCameraScale, 0.05);
 
     float react = uReactivity;
-    // Kept gentle and applied once -- an earlier version divided BOTH each
-    // jelly's radius AND the sampling coordinate by this same bass-driven
-    // squash (a compounding effect) at a large enough multiplier that
-    // fast bass envelope moves read as the whole field jittering rather
-    // than breathing. Scale explicitly tuned down further per feedback --
-    // "the range between 0-0.03" is where this reads as a subtle breathe
-    // rather than jitter.
-    float squash = 1.0 + uBass * react * 0.03;
 
     float field = 1.0e5;
     float nearestIdx = 0.0;
     for (int i = 0; i < kNumJellies; ++i)
     {
         float seed = float(i) * 11.3 + 2.0;
-        float speed = mix(0.06, 0.18, hashJ(seed)) * (0.5 + uMid * react * 0.6);
+        float speed = mix(0.06, 0.18, hashJ(seed));
         vec2 center = vec2(sin(uTime * speed + seed), cos(uTime * speed * 0.8 + seed * 1.7))
                     * mix(0.5, 1.3, hashJ(seed + 5.0));
         float radius = mix(0.28, 0.55, hashJ(seed + 9.0));
         float sides = floor(mix(3.0, 7.0, hashJ(seed + 13.0)));
         float rot = uTime * (0.1 + hashJ(seed + 17.0) * 0.3) * (0.4 + abs(uRotationSpeed)) + seed;
-        float wobble = (0.015 + uOnset * react * 0.03) * radius;
+        float wobble = 0.02 * radius;
 
         vec2 p = uv - center;
-        p.y /= squash; // bass squashes every jelly vertically, like it's bouncing under its own weight
         float d = sdPolygonJ(p, radius, sides, rot, wobble, 5.0 + hashJ(seed + 2.0) * 3.0);
 
         if (d < field)

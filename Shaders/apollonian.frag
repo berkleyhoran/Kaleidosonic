@@ -11,18 +11,33 @@
 // segmented and heavily audio-modulated: bass pushes the inversion
 // center, treble speeds the nesting, onset flashes the innermost rings.
 
-float apollonian(vec2 p, float scale)
+// Bug that made this render solid black at every setting: `s` was being
+// used as BOTH the per-iteration fold radius (dividing r2 to get k) AND
+// the running scale accumulator (s *= k), so it compounded as
+// s_new = s_old * (s_old / r2) = s_old^2 / r2 -- a quadratic runaway that
+// sends s to somewhere near 0 or nearly infinite within a handful of the
+// 10 iterations depending on whether r2 tends above or below 1, for
+// essentially every pixel. Whichever direction it blew up, the final
+// length(p)/abs(s) landed either far above 1 (glow's clamp(1-d,0,1)
+// floors to 0) or effectively 0 divided by a huge s (also ~0) -- either
+// way, zero glow everywhere, a black screen regardless of any parameter.
+// The fix (matching the standard Apollonian IFS formula this is based
+// on): fixedRadius2 stays a genuinely fixed value each iteration (it can
+// still vary frame-to-frame via the caller's audio/time-modulated
+// argument -- that part was fine), and totalScale is a SEPARATE
+// accumulator that only tracks the product of k's for the final divide.
+float apollonian(vec2 p, float fixedRadius2)
 {
-    float s = scale;
+    float totalScale = 1.0;
     for (int n = 0; n < 10; ++n)
     {
         p = -1.0 + 2.0 * fract(0.5 * p + 0.5);
         float r2 = dot(p, p);
-        float k = s / max(r2, 1e-4);
+        float k = fixedRadius2 / max(r2, 1e-4);
         p *= k;
-        s *= k;
+        totalScale *= k;
     }
-    return length(p) / abs(s);
+    return length(p) / abs(totalScale);
 }
 
 void main()

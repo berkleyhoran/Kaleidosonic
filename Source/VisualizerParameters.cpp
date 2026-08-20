@@ -261,9 +261,8 @@ namespace
             { ParamIDs::zoomSpeed, ParamIDs::cameraScale, ParamIDs::palette },
             /* 38 Water Ripples -- deliberately not audio-reactive (see the .frag header) */
             { ParamIDs::distortion, ParamIDs::cameraScale, ParamIDs::palette },
-            /* 39 Jelly Polygons */
-            { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::rotationSpeed, ParamIDs::cameraScale,
-              ParamIDs::palette },
+            /* 39 Jelly Polygons -- calm drifting now, no movement-based reactivity (Bass/Mid Gain no longer read) */
+            { ParamIDs::rotationSpeed, ParamIDs::cameraScale, ParamIDs::palette },
             /* 40 Goopy Slime */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::rotationSpeed,
               ParamIDs::cameraShake, ParamIDs::cameraScale, ParamIDs::palette },

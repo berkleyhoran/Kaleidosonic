@@ -148,9 +148,9 @@ namespace
             /* 2  Plasma Feedback */
             { ParamIDs::bassGain, ParamIDs::midGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed,
               ParamIDs::rotationSpeed, ParamIDs::distortion, ParamIDs::cameraShake, ParamIDs::feedbackAmount },
-            /* 3  Tunnel Spiral */
+            /* 3  Tunnel Spiral -- smooth constant zoom now, Camera Shake no longer read */
             { ParamIDs::bassGain, ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed,
-              ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion, ParamIDs::cameraShake,
+              ParamIDs::kaleidoscopeSegments, ParamIDs::iterations, ParamIDs::distortion,
               ParamIDs::cameraScale },
             /* 4  Burning Ship */
             { ParamIDs::trebleGain, ParamIDs::zoomSpeed, ParamIDs::rotationSpeed, ParamIDs::kaleidoscopeSegments,

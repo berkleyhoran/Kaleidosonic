@@ -11,9 +11,13 @@ void main()
     float radius = length(uv) + 1e-4;
     float angle = atan(uv.y, uv.x);
 
-    // Spiral speed is driven by Camera Shake, not Reactivity -- see
-    // Plasma Feedback's comment for why.
-    float spiralSpeed = uTime * (0.4 + 1.2 * uZoomSpeed) + uBass * uCameraShake * 9.0 + uOnset * uCameraShake * 4.0;
+    // Smooth, constant spiral speed -- Zoom Speed is the only thing that
+    // sets the pace. An earlier version added raw uBass/uOnset kicks
+    // directly into this per-frame phase term, which (since those are
+    // fast-fluctuating per-frame values, not integrated motion) read as
+    // the zoom jittering/surging unevenly rather than a smooth spin, per
+    // explicit feedback ("lets just do a smooth zoom since its too much").
+    float spiralSpeed = uTime * (0.4 + 1.2 * uZoomSpeed);
     float spiral = angle * (2.0 + uDistortion * 6.0) + 1.0 / radius - spiralSpeed;
 
     float bands = clamp(uIterations, 4.0, 40.0);

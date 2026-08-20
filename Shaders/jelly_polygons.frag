@@ -35,8 +35,10 @@ void main()
     // jelly's radius AND the sampling coordinate by this same bass-driven
     // squash (a compounding effect) at a large enough multiplier that
     // fast bass envelope moves read as the whole field jittering rather
-    // than breathing. Single application, smaller amount, fixes both.
-    float squash = 1.0 + uBass * react * 0.12;
+    // than breathing. Scale explicitly tuned down further per feedback --
+    // "the range between 0-0.03" is where this reads as a subtle breathe
+    // rather than jitter.
+    float squash = 1.0 + uBass * react * 0.03;
 
     float field = 1.0e5;
     float nearestIdx = 0.0;

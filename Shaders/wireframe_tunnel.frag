@@ -54,9 +54,16 @@ void main()
     vec2 uv = (vUv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
     float react = uReactivity;
 
-    float camZ = uTime * (1.4 + 5.0 * max(uZoomSpeed, 0.0)) + uBass * uCameraShake * 8.0 + uOnset * uCameraShake * 3.0;
+    // Smooth, constant travel speed -- Zoom Speed is the only thing that
+    // sets the pace. Earlier versions added raw uBass/uOnset kicks
+    // directly into camZ and an onset-driven FOV punch, both of which
+    // (being fast-fluctuating per-frame values, not integrated motion)
+    // read as the flight jittering/surging unevenly rather than a smooth
+    // fly-through, per explicit feedback ("lets just do a smooth zoom
+    // since its too much").
+    float camZ = uTime * (1.4 + 5.0 * max(uZoomSpeed, 0.0));
     vec3 ro = vec3(0.0, 0.0, camZ);
-    vec3 rd = normalize(vec3(uv * (1.0 + uOnset * uCameraShake * 0.15), 1.5 / uCameraScale));
+    vec3 rd = normalize(vec3(uv, 1.5 / uCameraScale));
     rd.xy = wfRot(sin(uTime * 0.08) * 0.12 * uRotationSpeed) * rd.xy;
 
     float t = 0.0;

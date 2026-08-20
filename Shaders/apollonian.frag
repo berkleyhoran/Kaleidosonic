@@ -11,33 +11,48 @@
 // segmented and heavily audio-modulated: bass pushes the inversion
 // center, treble speeds the nesting, onset flashes the innermost rings.
 
-// Bug that made this render solid black at every setting: `s` was being
-// used as BOTH the per-iteration fold radius (dividing r2 to get k) AND
-// the running scale accumulator (s *= k), so it compounded as
-// s_new = s_old * (s_old / r2) = s_old^2 / r2 -- a quadratic runaway that
-// sends s to somewhere near 0 or nearly infinite within a handful of the
-// 10 iterations depending on whether r2 tends above or below 1, for
-// essentially every pixel. Whichever direction it blew up, the final
-// length(p)/abs(s) landed either far above 1 (glow's clamp(1-d,0,1)
-// floors to 0) or effectively 0 divided by a huge s (also ~0) -- either
-// way, zero glow everywhere, a black screen regardless of any parameter.
-// The fix (matching the standard Apollonian IFS formula this is based
-// on): fixedRadius2 stays a genuinely fixed value each iteration (it can
-// still vary frame-to-frame via the caller's audio/time-modulated
-// argument -- that part was fine), and totalScale is a SEPARATE
-// accumulator that only tracks the product of k's for the final divide.
+// First bug (made this render solid black at every setting): `s` was used
+// as BOTH the per-iteration fold radius (dividing r2 to get k) AND the
+// running scale accumulator (s *= k), so it compounded as
+// s_new = s_old^2 / r2 -- a quadratic runaway sending it near 0 or near-
+// infinite within a handful of iterations, every pixel, every time --
+// zero glow everywhere regardless of any parameter.
+//
+// Second bug (fixed the black screen, but then rendered as flat, mostly
+// uniform color instead of the actual nested-circle detail): splitting
+// the accumulator out was necessary but not sufficient -- a *linear*
+// product of 10 k's still drifts strongly toward 0 or infinity whenever
+// fixedRadius2 isn't kept close to the fold's own natural r2 range
+// (~0..2, since p is always re-folded into [-1,1) each iteration), and
+// the caller's audio-modulated fixedRadius2 argument ranges up to ~3.2 --
+// nowhere near 1. With totalScale trending the same direction at nearly
+// every pixel, length(p)/totalScale ends up in a narrow band almost
+// everywhere, so glow's clamp(1-d,0,1) saturates near-uniformly instead
+// of tracing actual fractal boundaries.
+//
+// Real fix: an orbit trap instead of an accumulated-scale distance. p
+// is *always* bounded (the fract() fold keeps every component in
+// [-1,1), so r2 is always in [0,2]) regardless of fixedRadius2's exact
+// value -- tracking the minimum r2 reached across all 10 iterations is
+// therefore inherently stable and bounded no matter what, with no
+// accumulator to destabilize at all. This is the standard technique 2D
+// Apollonian/Mandelbox-family "fractal glow" shaders actually use --
+// color by *where* the fold's orbit passes closest to the origin, not by
+// a running scale product meant for literal 3D raymarch distance
+// estimation (which this preset was never doing in the first place; see
+// the file header -- there's no raymarch loop here at all).
 float apollonian(vec2 p, float fixedRadius2)
 {
-    float totalScale = 1.0;
+    float trap = 1.0e5;
     for (int n = 0; n < 10; ++n)
     {
         p = -1.0 + 2.0 * fract(0.5 * p + 0.5);
         float r2 = dot(p, p);
+        trap = min(trap, r2);
         float k = fixedRadius2 / max(r2, 1e-4);
         p *= k;
-        totalScale *= k;
     }
-    return length(p) / abs(totalScale);
+    return sqrt(trap);
 }
 
 void main()
